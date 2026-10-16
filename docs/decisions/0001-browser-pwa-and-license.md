@@ -1,7 +1,7 @@
-# ADR 0001: Browser-first foundation and 0BSD
+# ADR 0001: Browser prototype and initial 0BSD grant
 
-- **Status:** Superseded for the primary mobile target; the web PWA remains a supported independent client.
-- **Context:** The initial prototype began as a browser-first React/TypeScript PWA with local audio and IndexedDB. Native background playback and device-specific audio behavior could not be established by the browser client alone.
-- **Decision:** Retain the PWA as a separate client and add a native Kotlin/Jetpack Compose Android app using Android's media stack and local persistence. The Android app does not wrap or embed the PWA. Each client owns its UI, playback path, and data store.
-- **License:** Use OSI-approved [0BSD](https://opensource.org/license/0bsd), SPDX [`0BSD`](https://spdx.org/licenses/0BSD.html). This permissive license avoids inventing a copyright holder or legal identity and supports varied licenses for separately maintained extensions. Trade-off: 0BSD does not provide an express patent grant; contributors should seek review before adopting patent-sensitive code.
-- **Revisit when:** A further native platform, extension isolation design, or patent/licensing concern is established.
+- **Status:** Superseded for the current review-tree revision. The initial public code release used 0BSD; this local migration changes GoVibe-authored code to GPL-3.0-only going forward.
+- **Context:** The initial prototype began as a browser-first React/TypeScript PWA. A native Kotlin/Jetpack Compose Android application was later added for local audio playback and device media integration. The current migration removes the browser client and adds a small Rust queue core connected through JNI.
+- **Historical decision:** The earlier revision used [0BSD](https://opensource.org/license/0bsd), SPDX `0BSD`. That license grant was published with earlier copies of the source.
+- **Current review decision:** At the user's explicit request, the current local revision uses GNU GPL version 3, SPDX `GPL-3.0-only`, for GoVibe-authored code. The complete license text is in [`LICENSE`](../../LICENSE). Third-party dependencies retain their own terms and notices.
+- **Important scope:** A later license change cannot retroactively revoke permissions already granted under 0BSD for copies distributed with that license. The GPL migration is local and will not be pushed to the public repository unless the user reviews the exact changed files and approves publication.
