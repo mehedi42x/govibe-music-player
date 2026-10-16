@@ -1,6 +1,6 @@
-# Native Android extension profiles
+# JSON extension profiles
 
-GoVibe's Android extension system accepts `.aurora.json` manifests containing **declarative home-screen presentation data only**. Profiles may set a title, subtitle, badge, accent color, and plain-text detail rows. They cannot execute code, access the music library, make network requests, or supply audio.
+GoVibe's extension manager accepts `.aurora.json` manifests containing **declarative home-screen presentation data only**. Profiles may set a title, subtitle, badge, accent color, and plain-text detail rows. They cannot execute code, access the music library, make network requests, or supply audio.
 
 The format is defined by [`aurora-extension-format/schema-v1.json`](../aurora-extension-format/schema-v1.json).
 
@@ -17,7 +17,7 @@ A fresh installation contains no extension manifests. GoVibe's default home scre
 5. Use the profile card to enable/disable it or set it as the home profile.
 6. To return to GoVibe's own home, open **Settings → Home appearance** and select **GoVibe default home**.
 
-A minimal manifest template is available directly in the app. The schema requires the `format`, `formatVersion`, `id`, `name`, `version`, `author`, `description`, `capabilities`, and `presentation` fields.
+A minimal manifest template is available directly in the app. The schema requires `format`, `formatVersion`, `id`, `name`, `version`, `author`, `description`, `capabilities`, and `presentation` fields.
 
 ## Install manifests from GitHub
 
@@ -37,8 +37,4 @@ Only public repositories are supported; no GitHub sign-in or token is used. Each
 - Each detail row has a `label` (40 characters) and `value` (240 characters).
 - Manifests are limited to 64 KiB; unknown fields are rejected.
 
-Downloaded manifests are untrusted input. GoVibe parses and renders bounded text/color values only; it never downloads or executes extension code.
-
-## Compatibility
-
-This JSON profile importer is implemented for the native Android client. The separate web PWA's TypeScript provider SDK is a different contract and is not installed or executed by Android.
+Downloaded manifests are untrusted input. GoVibe parses and renders bounded text/color values only; it never downloads or executes extension code. The Rust core handles queue calculations and does not load extensions.

@@ -1,25 +1,15 @@
-# Plugin development (SDK v1.0.0)
+# Extension profile authoring
 
-The public contract is exported from `plugin-sdk/index.ts`. Implement `ProviderPlugin` and provide a manifest that passes `validateManifest`. The app-internal `src/plugins/local-library.ts` adapter powers core local-library search; it is not a separately installed extension. No third-party provider package is bundled with or executed by the app.
+GoVibe extensions are **declarative JSON home profiles**, not executable plugins. There is no JavaScript/TypeScript provider SDK or third-party code runtime in the app.
 
-**Scope:** This guide describes the separate web TypeScript SDK only. The native Android client uses the data-only `.aurora.json` home-profile format documented in [`EXTENSIONS.md`](EXTENSIONS.md); Android does not install or execute these TypeScript packages.
+## Create a profile
 
-## Manifest and compatibility
+Start with the in-app template or a copy of [`examples/extension-profile.example.aurora.json`](../examples/extension-profile.example.aurora.json). Validate the JSON against [`aurora-extension-format/schema-v1.json`](../aurora-extension-format/schema-v1.json) and the constraints in [Extension setup](EXTENSIONS.md).
 
-A manifest contains a unique lowercase dotted/hyphenated `id`, display `name`, semantic `version`, `description`, exact `sdkVersion`, explicit `authentication` mode (`none`, `oauth2`, `api-key`, or `account`), declared `capabilities`, least-privilege `permissions`, and a relative `entry` path. SDK v1.0.0 accepts `search`, `metadata`, `playback`, `playlists`, `lyrics`, `scrobbling`, and `recommendations`. Permission names are `library.read`, `playback.resolve`, `network.request`, and `account.read`. Authenticated manifests must declare both `account.read` and `network.request`; no OAuth/API-key broker or token vault exists in this release.
+Each profile may specify a display name, semantic version, author, description, supported UI/theme/metadata capabilities, an accent color, and short plain-text labels/details. Keep values concise and do not include secrets, account data, file paths, executable content, or remote URLs.
 
-## Data and operations
+## Publish a profile catalog
 
-The SDK publishes provider track, album, artist, playlist, lyrics, and audio-format metadata types. `search(query, signal?)` returns provider track metadata; `resolve(trackId, signal?)` returns a playable Blob or `null`. Optional methods expose track/album/artist/playlist details, lyrics, recommendations, and scrobbling. Implement only capabilities declared in the manifest. A future runtime must broker playback and credentials instead of trusting plugin declarations.
+For community discovery, place one `.aurora.json` file per profile in the `aurora-extensions/` directory at the root of a public GitHub repository. Users initiate a scan in GoVibe, inspect each parsed preview, and choose whether to install it. A URL alone does not trigger a scan. Invalid or unsupported manifests are rejected.
 
-Operations are asynchronous and accept `AbortSignal` where applicable. Abort stale requests promptly and dispose plugin-owned resources. Failures may use `ProviderError` with stable codes (`ABORTED`, `AUTH_REQUIRED`, `AUTH_EXPIRED`, `RATE_LIMITED`, `NETWORK`, `UNSUPPORTED`, `NOT_FOUND`, `PERMISSION_DENIED`, `INVALID_RESPONSE`, `INTERNAL`) plus `retryable` and optional `retryAfterMs`. Do not return fabricated metadata after an error.
-
-## Test expectations
-
-Test empty queries, cancellation, unsupported tracks, auth expiry for providers that need it, rate limits, invalid responses, declared permissions, repeated initialization/disposal, offline behavior, and truthful codec/quality claims. Use deterministic mocks in CI; run real-provider tests only with authorized test credentials and service permission.
-
-## Packaging and installation status
-
-The example uses a relative import into this repository because the SDK is not yet published as an npm package. A future distributable format should specify signed packages, dependency locks, manifest/content validation, integrity checks, permission review, installation, update, diagnostics, isolation, and removal. **GoVibe 0.1.0 does not discover, install, activate, update, or execute external packages.** Passing manifest validation is not a security approval or sandbox.
-
-Never bundle secrets or copyrighted audio. Follow API terms and licensing rules. Do not implement protected stream extraction, DRM circumvention, or subscription bypass.
+The app downloads JSON data only. It never executes code from the repository and profiles cannot access audio, make network requests, or provide streams. No profile is included with GoVibe by default.

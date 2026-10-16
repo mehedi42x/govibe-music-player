@@ -1,21 +1,31 @@
 # Installation
 
-## Run the web PWA from source
+## Build and install a local debug APK
 
-1. Install Node.js 22 or newer and npm.
-2. Clone or download the source.
-3. In the project root, run `npm ci`.
-4. Run `npm run dev` for development, or `npm run build && npm run preview` for a production-style web preview.
-5. Open Vite's local URL and import audio files in the browser.
+GoVibe is currently distributed in this review tree as Android source, not as a prebuilt APK.
 
-## Android APK
+1. Install JDK 17+, Android SDK Platform/API 36, Android Build-Tools 36.0.0, the NDK version specified in `android/app/build.gradle`, Rust/Cargo, the Android Rust targets, and `cargo-ndk`.
+2. Review the applicable Android SDK and NDK license terms before installing or using them. No unattended license acceptance is used by this project.
+3. Configure `ANDROID_HOME` or `ANDROID_SDK_ROOT` and `ANDROID_NDK_HOME`.
+4. From the repository root, build the local debug APK:
 
-The source review bundle contains no APK. To make a local debug APK, install the Android SDK Platform and Build-Tools versions listed in [Building](BUILDING.md), review and accept the applicable SDK terms, then run `cd android && ./gradlew assembleDebug`. The expected APK is `android/app/build/outputs/apk/debug/app-debug.apk`. This is a local debug build, not a Play Store release.
+   ```bash
+   cd android
+   ./gradlew assembleDebug
+   ```
 
-## Install the browser PWA on Android
+5. Install `app/build/outputs/apk/debug/app-debug.apk` on a compatible test device using Android Studio or `adb install`.
 
-Open a trusted HTTPS-hosted copy of the PWA in Android Chrome, then choose **Install app** or **Add to Home screen** from the browser menu. This installs a browser-based PWA, not an APK; background audio and other behavior depend on Chrome and the device and do not use native Media3. A secure HTTPS origin is required for installable/offline PWA features; opening local files with `file://` is not equivalent.
+This is a debug build for local testing, not a Play Store release. Do not use the app with important data until Room/URI persistence and playback have been verified on your target device. Preserve original audio files: GoVibe indexes selected URIs but does not back up the files.
 
-## Native local audio and extensions
+## First run
 
-The Android app asks the user to choose files through Android's system document picker. It stores metadata and selected URI references locally, not uploaded audio copies. A fresh install has no extensions; the default home is part of the app. Users can add declarative profiles through JSON or public GitHub manifests. The selected audio remains at its original document URI, so keep original files separately.
+GoVibe starts with an empty local library and no preinstalled extensions. Use **Add audio** to pick files from Android's system document picker. Optionally create or scan for a declarative JSON home profile from **Extensions**; scanning a public GitHub repository is only started after you tap the scan button.
+
+## Current build limitation
+
+The current review computer has no Android SDK/NDK or `cargo-ndk`, so no APK has been produced or device-tested here. See [Building](BUILDING.md) for verification status and prerequisites.
+
+## Source license
+
+GoVibe-authored code in this local review revision is GPL-3.0-only. Third-party dependencies retain their own licenses; see the unchanged [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md). Earlier publicly distributed 0BSD copies remain under the permissions previously granted for those copies.

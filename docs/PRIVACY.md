@@ -2,7 +2,7 @@
 
 GoVibe is local-first and provides no first-party account service.
 
-## Native Android app
+## Android app
 
 - No sign-in, analytics, advertising, scrobbling, or provider API key is active.
 - No extension is installed by default. User-installed declarative profile JSON, library metadata, selected document URI references, favorites, and appearance settings are stored locally in Room or app preferences.
@@ -12,15 +12,13 @@ GoVibe is local-first and provides no first-party account service.
 - Standard Android app-data backup is disabled. GoVibe does not encrypt Room data or app preferences; protect the device and its user account.
 - Removing app data or uninstalling may erase library metadata and settings. Keep original audio files separately; export/restore is not implemented.
 
-## Web PWA
-
-The separate web app stores selected audio Blobs and metadata, playlists, settings, history, and queue state in IndexedDB for the current browser profile. Browser quotas and eviction policies apply. The browser app does not upload or synchronize the library. Clearing site data can remove it; retain original audio files.
-
 ## Data handling summary
 
-| Data                     | Native Android                                                                    | Web PWA                           |
-| ------------------------ | --------------------------------------------------------------------------------- | --------------------------------- |
-| Audio bytes              | Read via selected document URI; not uploaded or copied to a service               | Stored as local IndexedDB Blobs   |
-| Track metadata/favorites | Local Room database                                                               | Local IndexedDB                   |
-| Extension profiles       | None preinstalled; user-added JSON is local; public GitHub scan is user-initiated | No extension installation/runtime |
-| Accounts/analytics       | None                                                                              | None                              |
+| Data | Android handling |
+| --- | --- |
+| Audio bytes | Read via selected document URI; not uploaded or copied to a service |
+| Track metadata/favorites | Local Room database |
+| Extension profiles | None preinstalled; user-added JSON is local; public GitHub scan is user-initiated |
+| Accounts/analytics | None |
+
+The Rust queue core receives only primitive navigation values through JNI. It does not read files, network data, personal data, or extension manifests.

@@ -1,45 +1,39 @@
 # Architecture
 
-## Two separate clients
+## One native Android application
 
-GoVibe maintains a React/TypeScript browser PWA and a native Kotlin/Jetpack Compose Android client. The Android app does not embed the web app in a WebView. They share product concepts and the declarative extension format but use separate UI, playback, and persistence implementations.
-
-The web client uses Vite, HTML audio, Web Audio, and IndexedDB. Android uses Jetpack Compose, Room, Android's system document picker, and AndroidX Media3. Native Gradle/device verification remains pending; this source package does not include an APK.
+GoVibe is a native Android local-audio player. Kotlin and Jetpack Compose own the screens, Android lifecycle, system document picker, Room persistence, Media3 playback service, and the declarative JSON/GitHub extension manager. Rust provides a small deterministic queue-navigation core loaded into the app as `libgovibe_core.so` through JNI. There is no browser/PWA client, WebView wrapper, JavaScript runtime, or network music provider.
 
 ## Repository boundaries
 
-### Web PWA
+### Kotlin / Android (`android/`)
 
-- `src/App.tsx` — navigation, browser library views, forms, and playback interaction.
-- `src/core/queue.ts` — pure queue transitions.
-- `src/core/quality.ts` — provider-format selection and truthful quality labels.
-- `src/core/plugins.ts` and `plugin-sdk/` — web provider SDK contract and manifest validation.
-- `src/domain/models.ts` — web domain types and SDK/core version constants.
-- `src/plugins/local-library.ts` — app-internal local-library adapter; not a separately installed extension.
-- `src/data/library-db.ts` — IndexedDB persistence and migrations.
-- Vite and `vite-plugin-pwa` — web asset bundling and offline shell.
+- `app/src/main/java/com/aurora/musicplayer/MainActivity.kt` — Compose entry, system audio document picker, MediaController connection, and Rust-backed queue navigation.
+- `.../ui/` — Compose Home, Library, Now Playing, Extensions, and Settings screens.
+- `.../data/` — Room entities, DAOs, and local library metadata/history persistence.
+- `.../playback/PlaybackService.kt` — AndroidX Media3 ExoPlayer hosted by a MediaSessionService; this is the audio playback/decoding path.
+- `.../extensions/` — bounded `.aurora.json` parsing, installed profile management, and explicit public GitHub Contents API scanning.
+- `app/src/main/assets/licenses/` — existing packaged third-party license materials.
 
-### Native Android
+### Rust (`rust/govibe-core/`)
 
-- `android/app/src/main/java/com/aurora/musicplayer/MainActivity.kt` — Compose entry point and MediaController connection.
-- `android/.../data/` — Room entities/DAOs and local library repository.
-- `android/.../playback/PlaybackService.kt` — Media3 ExoPlayer hosted by a MediaSessionService.
-- `android/.../extensions/` — strict declarative parser, user-installed profile management, and public GitHub Contents API scanner.
+- `src/lib.rs` — pure queue index selection for sequential, repeat, and shuffle navigation; primitive-only JNI entry points; host unit tests.
+- The crate has no external Rust dependencies. Rust does **not** decode, transform, or access audio files, Android objects, network data, or the extension database.
+- `android/app/src/main/java/com/aurora/musicplayer/core/NativePlaybackCore.kt` is the single Kotlin library-loading/FFI boundary.
+- `scripts/build-android-rust.sh` uses `cargo-ndk` and an installed Android NDK to build the shared library for packaged Android ABIs. Gradle packages the generated libraries.
 
-No extension manifests are packaged in Android assets. GoVibe's default home is implemented by the app UI; a fresh install starts with no extensions. Startup removes legacy bundled rows from development databases while preserving user-installed community profiles.
+## Local data and playback
 
-## Data and playback
+The Android system document picker grants access only to user-selected audio. GoVibe stores URI references and best-effort metadata in Room; it does not copy audio to a server. URI access depends on document-provider grants and file availability. Media3 reads the selected source and exposes a system MediaSession. Device decoder/output behavior determines the actual audio path; GoVibe does not claim verified bit-perfect output.
 
-The PWA stores selected audio Blobs, tags, playlists, settings, history, and queue data in browser IndexedDB. Each browser profile has its own library and quotas.
-
-Android stores selected document URI strings and best-effort audio metadata in Room. Audio files are not copied to a server. Android's Storage Access Framework grants access only to user-selected documents; persistence depends on the document provider's URI permissions and file availability. Media3 reads the selected source and exposes a system MediaSession. Device decoder/output behavior determines the actual audio path; GoVibe does not claim verified bit-perfect output.
+Rust receives only primitive queue sizes, indexes, repeat modes, shuffle flags, and seeds through JNI. It returns a valid index or `-1` when there is no valid successor/predecessor. Kotlin validates and uses those results to seek the MediaController. Media3 remains responsible for playback, automatic transitions, audio decoding, and session behavior.
 
 ## Extension boundary
 
-The Android `.aurora.json` format is presentation metadata, not executable plugin code. A manifest may declare supported UI/theme/metadata capabilities and provide bounded plain-text labels, colors, and detail rows. Unknown fields, unsupported capabilities, excessive size, and invalid values are rejected. Imported manifests cannot search or play audio, access local files, invoke JavaScript/Kotlin, fetch arbitrary URLs, or request permissions.
+The `.aurora.json` format is presentation metadata, not executable plugin code. A manifest may declare supported UI/theme/metadata capabilities and provide bounded plain-text labels, colors, and detail rows. Unknown fields, unsupported capabilities, excessive size, and invalid values are rejected. Imported manifests cannot search or play audio, access local files, invoke JavaScript/Kotlin/Rust, fetch arbitrary URLs, or request permissions.
 
-The Android app can scan a public GitHub repository's root `aurora-extensions/` directory using the unauthenticated GitHub Contents API after the user requests a scan. It previews valid manifests before installation and caps each scan at 20 files. GitHub source is untrusted input; parsing is bounded and no downloaded code is executed. The web provider SDK is separate and is not loaded by the native app.
+The Android app can scan a public GitHub repository's root `aurora-extensions/` directory using the unauthenticated GitHub Contents API after the user explicitly requests a scan. It previews valid manifests before installation and caps each scan at 20 files. No manifests are packaged; a fresh install has no extensions. GitHub source is untrusted input, parsing is bounded, and downloaded code is never executed.
 
-## Build status
+## Build and verification status
 
-The native code has not yet been verified by Gradle or on an Android device. No APK is included in the source review bundle. The browser PWA can run on Android from HTTPS but is not a native substitute for Media3 playback.
+Rust host formatting, tests, and lint can run without Android SDK components. Building the Android app requires the Android SDK, NDK, Rust toolchain, and `cargo-ndk`; the Gradle task builds the JNI library before packaging. This review computer has no Android SDK/NDK and no `cargo-ndk`, so Android Gradle compilation, APK generation, and device verification are pending. No SDK license is accepted automatically, and no release or publication is part of this review.
