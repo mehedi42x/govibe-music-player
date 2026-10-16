@@ -1,19 +1,20 @@
-# Integrations
+# Music-source integrations
 
-GoVibe currently provides local audio playback and a public GitHub JSON-manifest scanner. A declarative home-screen profile is not a streaming provider. **No online music provider or executable extension is bundled or enabled by default.**
+NextVibe has an optional, user-selected music-source contract. **No provider is bundled or enabled by default**, and the app does not scrape arbitrary sites or install executable provider code. See [Extensions](EXTENSIONS.md) and the [provider contract](PLUGIN_DEVELOPMENT.md).
 
-| Source | Status | Network/audio behavior |
-| --- | --- | --- |
-| Local library | Implemented: user-selected documents, best-effort metadata, Media3 playback | Local content only; codec and output behavior vary by device |
-| Public GitHub manifests | User-initiated scan, preview, and install of declarative `.aurora.json` profiles | Public GitHub Contents API only; never an audio source |
-| Streaming music services | Not implemented | No streaming, extraction, or provider credentials |
-| Executable community providers | Not supported | Community data is JSON only; no code is installed or executed |
+| Capability | Status | Boundary |
+|---|---|---|
+| Local library | System picker plus opt-in shared-audio MediaStore scan; Room metadata, favorites, local-history ranking and Media3 playback | Android exposes shared media only. A scan needs runtime permission; other apps' private folders are not accessible. |
+| User-added music source | Declarative HTTPS manifest with trending/search endpoints; normalized track metadata, artwork and direct stream URLs render in NextVibe UI | No arbitrary headers, credentials, code, scraping, protected-stream extraction, DRM bypass or provider UI. Source compatibility and permissions depend on each service. |
+| Public GitHub manifests | User-initiated repository scan, preview and install | Public GitHub API discovery only; it does not itself provide audio. |
+| Offline playback | Indexed or individually selected local audio | No remote downloads or cached streaming catalogue. |
+| Audio controls | Player volume, device-session EQ presets and optional +3 dB max boost | Android AudioEffect support varies by device; no bit-perfect claim. |
 
 ## Integration rules
 
-- Declare capabilities honestly; a presentation profile does not provide search, authentication, or audio.
-- Use documented, authorized interfaces and permitted playback mechanisms for any future integration.
+- Declare capabilities honestly; a valid catalogue response does not guarantee that its stream is reachable or playable.
+- Use documented, authorized interfaces and permitted playback mechanisms.
 - Do not spoof clients, extract protected streams, bypass subscriptions, or circumvent DRM.
-- Keep API keys and user tokens out of source control and logs.
-- Handle cancellation, offline states, expiry, and service rate limits.
-- Do not mark search, authentication, audio quality, or playback as implemented until tested through a permitted service path.
+- Keep API keys and user tokens out of source control and logs. The current declarative source schema does not support private credentials.
+- Handle cancellation, offline states, expiry, source rate limits and invalid data.
+- Do not mark codec support, output quality, authentication, or device effects as verified until tested on supported Android devices.

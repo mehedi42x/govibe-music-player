@@ -1,4 +1,4 @@
-GoVibe Android Native Client — Third-party software notices
+NextVibe Android Native Client — Third-party software notices
 
 Direct AndroidX runtime dependencies in the native app are licensed under the Apache License, Version 2.0. A copy is bundled as Apache-2.0.txt in this folder. Upstream license: https://github.com/androidx/androidx/blob/androidx-main/LICENSE.txt
 
@@ -20,4 +20,4 @@ Direct dependencies and pinned versions:
 - androidx.room:room-runtime:2.8.5
 - androidx.room:room-ktx:2.8.5
 
-The complete resolved Android runtime/transitive dependency inventory has not yet been generated because Android SDK installation/build is pending approval. Update this notice after the licensed SDK build is available and before distributing a binary.
+The source-client, MediaStore scanner, connectivity monitor and playback EQ/boost use Android platform APIs and add no direct runtime dependency. The complete resolved Android runtime/transitive dependency inventory has not yet been generated because this review does not install Android SDK components or accept SDK licenses. Update this notice after a licensed SDK build environment becomes available and before distributing a binary.

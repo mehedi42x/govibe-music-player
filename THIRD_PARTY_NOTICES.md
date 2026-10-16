@@ -1,6 +1,6 @@
 # Third-party notices
 
-This notice covers third-party components in the current Kotlin Android + Rust source tree. GoVibe-authored code is covered by the root [`GPL-3.0-only` license](LICENSE); that does not change the licenses of third-party software.
+This notice covers third-party components in the current Kotlin Android + Rust source tree. NextVibe-authored code is covered by the root [`GPL-3.0-only` license](LICENSE); that does not change the licenses of third-party software.
 
 ## Android runtime dependencies
 
@@ -21,12 +21,12 @@ The direct AndroidX and Media3 dependencies below are distributed under the Apac
 | `androidx.media3:media3-exoplayer` and `media3-session` | `1.11.1` |
 | `androidx.room:room-runtime` and `room-ktx` | `2.8.5` |
 
-The full Apache-2.0 license text and AndroidX/Media3 notices are preserved in `android/app/src/main/assets/licenses/Apache-2.0.txt` and `android/app/src/main/assets/licenses/THIRD_PARTY_NOTICES.txt`. Upstream sources: [AndroidX](https://github.com/androidx/androidx/blob/androidx-main/LICENSE.txt) and [Media3](https://github.com/androidx/media).
+The source client and bounded artwork loader use Android/Java networking and bitmap APIs. The opt-in shared-audio scanner uses Android MediaStore/permission APIs, network status uses ConnectivityManager, and playback EQ/boost uses Android audio effects; none adds a runtime dependency. Existing Apache-2.0 license materials remain under `android/app/src/main/assets/licenses/`. Upstream sources: [AndroidX](https://github.com/androidx/androidx/blob/androidx-main/LICENSE.txt) and [Media3](https://github.com/androidx/media).
 
 ## Build tools
 
-The checked-in Gradle wrapper scripts are generated Gradle files with their own Apache-2.0 license headers. Do not replace those notices with GoVibe's GPL header. GitHub Actions used by the workflows are external build services/actions and are not bundled into the APK.
+Checked-in Gradle wrapper scripts are generated Gradle files with Apache-2.0 headers; do not replace those notices with the project's GPL header. GitHub Actions are external build services/actions and are not bundled into the APK.
 
 ## Rust dependencies and audit status
 
-The Rust queue crate currently has no third-party Cargo dependencies. JUnit, AndroidX test libraries, Compose tooling, Kotlin/Gradle build plugins, and transitive Android dependencies are not exhaustively inventoried here. A complete resolved dependency/license report must be generated and reviewed after an Android SDK build environment is available, before distributing an APK. Verify the Apache-2.0 assets are packaged in the first release build; Gradle currently excludes dependency `META-INF/LICENSE*` and `META-INF/NOTICE*` resources.
+The Rust queue crate currently has no third-party Cargo dependencies. JUnit, AndroidX test libraries, Compose tooling, Kotlin/Gradle build plugins and transitive Android dependencies are not exhaustively inventoried here. A resolved dependency/license report must be reviewed after an Android SDK build, before distributing an APK. Verify the Apache-2.0 assets are packaged in a release build; Gradle currently excludes dependency `META-INF/LICENSE*` and `META-INF/NOTICE*` resources.

@@ -62,6 +62,19 @@ data class PlaybackHistoryEntity(
     val playedAt: Long = System.currentTimeMillis(),
 )
 
+@Entity(tableName = "remote_play_history", indices = [Index("sourceId"), Index("playedAt")])
+data class RemotePlaybackHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sourceId: String,
+    val trackId: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val artworkUrl: String,
+    val durationMs: Long,
+    val playedAt: Long = System.currentTimeMillis(),
+)
+
 @Entity(tableName = "installed_extensions")
 data class InstalledExtensionEntity(
     @PrimaryKey val id: String,

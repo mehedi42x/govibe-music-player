@@ -1,24 +1,11 @@
 # Privacy
 
-GoVibe is local-first and provides no first-party account service.
+NextVibe is local-first and has no first-party account service. No music source is bundled.
 
-## Android app
+Local audio may be added individually through Android's system picker, or—when the user taps **Scan device audio**—indexed from the shared audio collection exposed by Android MediaStore. Android requests `READ_MEDIA_AUDIO` on Android 13+ or `READ_EXTERNAL_STORAGE` on older supported versions at that point. The app does not request `MANAGE_EXTERNAL_STORAGE`; Android does not expose another app's private folders through this scan. A user may decline the permission and use the system picker instead. URI references, track metadata and favorites remain in Room; existing local audio is not copied to a NextVibe server.
 
-- No sign-in, analytics, advertising, scrobbling, or provider API key is active.
-- No extension is installed by default. User-installed declarative profile JSON, library metadata, selected document URI references, favorites, and appearance settings are stored locally in Room or app preferences.
-- Audio files are not copied to GoVibe's server or uploaded. Playback reads the user-selected document URI through Android's media stack. A URI grant does not guarantee the original file will remain available if moved or deleted.
-- The app requests `INTERNET` only to support a user-initiated scan of public GitHub repositories for `.aurora.json` profiles. The unauthenticated GitHub Contents API is contacted only when the user explicitly scans; the app does not transmit the audio library, credentials, or listening history. GitHub's own privacy policy applies to that request.
-- No broad media-library permission is requested. Android's system document picker grants access only to files the user selects.
-- Standard Android app-data backup is disabled. GoVibe does not encrypt Room data or app preferences; protect the device and its user account.
-- Removing app data or uninstalling may erase library metadata and settings. Keep original audio files separately; export/restore is not implemented.
+Listening history for local and source tracks is stored in Room. Recommendation ranking uses artist play counts on-device; that taste history is not sent to a provider. Local artist profiles filter the local library on-device. An artist name is sent to the explicitly selected source only when the user opens an artist from a source track or taps **Find songs in [source]** from a local artist profile; ordinary local-profile browsing does not make a source request. Search terms are also sent to the selected source. Trending and artwork requests contact that source's declared HTTPS host/CDN. GitHub discovery is a separate user-initiated scan of a public repository and uses the unauthenticated public API.
 
-## Data handling summary
+An offline download can start only after the user taps its button, and only when the selected source manifest declares `downloadsAllowed: true`. Each download is limited to 250 MiB, fetched from a public HTTPS stream and saved in the shared `Music/NextVibe` folder through Android MediaStore. Other apps with audio access may see these files. Android 10+ uses scoped MediaStore without requesting broad storage access; Android 9 and below request `WRITE_EXTERNAL_STORAGE` only when a download is started. The manifest flag is the provider's claim, not a legal-rights verification. Downloads are not uploaded. Clearing library/history removes Room indexes and playback history but does not delete completed Music/NextVibe files, original audio, or installed sources.
 
-| Data | Android handling |
-| --- | --- |
-| Audio bytes | Read via selected document URI; not uploaded or copied to a service |
-| Track metadata/favorites | Local Room database |
-| Extension profiles | None preinstalled; user-added JSON is local; public GitHub scan is user-initiated |
-| Accounts/analytics | None |
-
-The Rust queue core receives only primitive navigation values through JNI. It does not read files, network data, personal data, or extension manifests.
+Playback volume, equalizer preset and optional +3 dB maximum boost are stored in app preferences and applied to the app's Media3 audio session. Boost is off by default; audio effects are device-dependent and can clip. Standard Android app-data backup is disabled; Room data and preferences are not encrypted by the app.

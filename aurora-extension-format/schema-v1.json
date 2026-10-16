@@ -1,19 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GoVibe Extension Manifest v1",
+  "title": "NextVibe Source Manifest v1",
+  "description": "Declarative user-added HTTPS music source settings. It contains no executable code or UI description.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "format",
-    "formatVersion",
-    "id",
-    "name",
-    "version",
-    "author",
-    "description",
-    "capabilities",
-    "presentation"
-  ],
+  "required": ["format", "formatVersion", "id", "name", "version", "author", "description", "capabilities"],
   "properties": {
     "format": { "const": "aurora-extension" },
     "formatVersion": { "const": 1 },
@@ -29,11 +20,23 @@
     "capabilities": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 3,
+      "maxItems": 4,
       "uniqueItems": true,
-      "items": { "enum": ["ui.home", "theme.accent", "metadata.display"] }
+      "items": { "enum": ["ui.home", "theme.accent", "metadata.display", "music.source"] }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl", "trendingPath", "searchPath"],
+      "properties": {
+        "baseUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 300 },
+        "trendingPath": { "type": "string", "pattern": "^/(?!/)", "maxLength": 300 },
+        "searchPath": { "type": "string", "pattern": "^/(?!/).*\\{query\\}", "maxLength": 300 },
+        "downloadsAllowed": { "type": "boolean", "default": false, "description": "Explicitly declares that this source allows user-requested copies of its direct public audio streams for offline playback. Enabling this is the provider's responsibility and is not a license verification." }
+      }
     },
     "presentation": {
+      "description": "Optional legacy field accepted only to read old stored profiles. NextVibe ignores it; source manifests should omit it.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -56,5 +59,20 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "capabilities": { "contains": { "const": "music.source" } } },
+        "required": ["capabilities"]
+      },
+      "then": { "required": ["source"] }
+    },
+    {
+      "if": { "required": ["source"] },
+      "then": {
+        "properties": { "capabilities": { "contains": { "const": "music.source" } } }
+      }
+    }
+  ]
 }

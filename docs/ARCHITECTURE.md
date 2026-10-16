@@ -1,39 +1,29 @@
 # Architecture
 
-## One native Android application
-
-GoVibe is a native Android local-audio player. Kotlin and Jetpack Compose own the screens, Android lifecycle, system document picker, Room persistence, Media3 playback service, and the declarative JSON/GitHub extension manager. Rust provides a small deterministic queue-navigation core loaded into the app as `libgovibe_core.so` through JNI. There is no browser/PWA client, WebView wrapper, JavaScript runtime, or network music provider.
+NextVibe is a native Android music player. Kotlin/Jetpack Compose owns UI, Android lifecycle, local Room persistence, the source JSON client and Media3 playback service. Rust supplies a small deterministic queue-navigation core through JNI. The application ID and JNI package remain `com.aurora.musicplayer` for compatibility.
 
 ## Repository boundaries
 
-### Kotlin / Android (`android/`)
+- `android/app/src/main/java/com/aurora/musicplayer/ui/` — app-owned Home, Search, Library, artist profiles, Settings, artwork, mini-player and Now Playing UI. Local embedded cover art is decoded on-device; remote art uses bounded HTTPS fetches with validated redirects, and player progress is animated in Compose.
+- `.../extensions/` — validated manifest parsing, explicit source selection, public GitHub JSON discovery, and bounded HTTPS catalogue client.
+- `.../data/` — Room library, opt-in MediaStore scanning, local/remote play history, and user-requested source downloads. Permitted downloads are streamed into shared `Music/NextVibe` through MediaStore and indexed in Room for offline playback; recommendations rank artist-frequency history on-device.
+- `.../playback/` — Android Media3 ExoPlayer and MediaSession service, player volume, device Equalizer and LoudnessEnhancer.
+- `rust/govibe-core/` — dependency-free queue-navigation functions and JNI boundary.
 
-- `app/src/main/java/com/aurora/musicplayer/MainActivity.kt` — Compose entry, system audio document picker, MediaController connection, and Rust-backed queue navigation.
-- `.../ui/` — Compose Home, Library, Now Playing, Extensions, and Settings screens.
-- `.../data/` — Room entities, DAOs, and local library metadata/history persistence.
-- `.../playback/PlaybackService.kt` — AndroidX Media3 ExoPlayer hosted by a MediaSessionService; this is the audio playback/decoding path.
-- `.../extensions/` — bounded `.aurora.json` parsing, installed profile management, and explicit public GitHub Contents API scanning.
-- `app/src/main/assets/licenses/` — existing packaged third-party license materials.
+## Online/offline mode
 
-### Rust (`rust/govibe-core/`)
+A top-level mode switch selects Online or Offline. Android ConnectivityManager's validated-network status chooses the initial mode: Online when available, Offline when not. Network loss switches to the Offline portal; the user may also select Offline while connected. Offline search and playback use the local Room library and do not request a source feed.
 
-- `src/lib.rs` — pure queue index selection for sequential, repeat, and shuffle navigation; primitive-only JNI entry points; host unit tests.
-- The crate has no external Rust dependencies. Rust does **not** decode, transform, or access audio files, Android objects, network data, or the extension database.
-- `android/app/src/main/java/com/aurora/musicplayer/core/NativePlaybackCore.kt` is the single Kotlin library-loading/FFI boundary.
-- `scripts/build-android-rust.sh` uses `cargo-ndk` and an installed Android NDK to build the shared library for packaged Android ABIs. Gradle packages the generated libraries.
+The user can request a MediaStore scan from the Offline portal or Library. Runtime `READ_MEDIA_AUDIO` (Android 13+) / `READ_EXTERNAL_STORAGE` (older supported Android) is requested only after that action. The scanner reads shared audio exposed by MediaStore, stores track URIs/metadata in Room and does not copy files. It cannot access other apps' private directories. The document picker remains an alternative.
 
-## Local data and playback
+## Source boundary
 
-The Android system document picker grants access only to user-selected audio. GoVibe stores URI references and best-effort metadata in Room; it does not copy audio to a server. URI access depends on document-provider grants and file availability. Media3 reads the selected source and exposes a system MediaSession. Device decoder/output behavior determines the actual audio path; GoVibe does not claim verified bit-perfect output.
+An optional user-installed manifest contains only a public HTTPS origin and trending/search paths, with optional `downloadsAllowed=false`. Its API returns normalized track metadata including title, artist, description, artwork URL, and playable stream URL. Artist profiles reuse the selected source's search endpoint only when opened from a source result or explicitly requested from a local profile; local profile filtering stays on-device. Downloads are user-clicked and source-gated; HTTPS responses are limited to four redirects and 250 MiB before publication to shared `Music/NextVibe`. NextVibe owns all visuals and controls. No bundled provider, source-code runtime, arbitrary headers, credentials, scraping, or provider-defined UI is included. Search terms go to the actively selected source; listening history does not.
 
-Rust receives only primitive queue sizes, indexes, repeat modes, shuffle flags, and seeds through JNI. It returns a valid index or `-1` when there is no valid successor/predecessor. Kotlin validates and uses those results to seek the MediaController. Media3 remains responsible for playback, automatic transitions, audio decoding, and session behavior.
+## Playback and local data
 
-## Extension boundary
+Local/source histories and recommendations remain on-device. Room v2 adds source listening history through an explicit v1-to-v2 migration. Settings' volume slider controls Media3 volume; the optional +3 dB ceiling is applied with Android LoudnessEnhancer, and Equalizer presets attach to the active audio session when Android reports it. Audio-effect support is device-dependent and requires build/device testing. Media3 handles stream decoding, transitions and the system media session.
 
-The `.aurora.json` format is presentation metadata, not executable plugin code. A manifest may declare supported UI/theme/metadata capabilities and provide bounded plain-text labels, colors, and detail rows. Unknown fields, unsupported capabilities, excessive size, and invalid values are rejected. Imported manifests cannot search or play audio, access local files, invoke JavaScript/Kotlin/Rust, fetch arbitrary URLs, or request permissions.
+## Compatibility and verification
 
-The Android app can scan a public GitHub repository's root `aurora-extensions/` directory using the unauthenticated GitHub Contents API after the user explicitly requests a scan. It previews valid manifests before installation and caps each scan at 20 files. No manifests are packaged; a fresh install has no extensions. GitHub source is untrusted input, parsing is bounded, and downloaded code is never executed.
-
-## Build and verification status
-
-Rust host formatting, tests, and lint can run without Android SDK components. Building the Android app requires the Android SDK, NDK, Rust toolchain, and `cargo-ndk`; the Gradle task builds the JNI library before packaging. This review computer has no Android SDK/NDK and no `cargo-ndk`, so Android Gradle compilation, APK generation, and device verification are pending. No SDK license is accepted automatically, and no release or publication is part of this review.
+Old `.aurora.json` presentation-only manifests remain parseable, but their presentation is ignored and they cannot be installed as sources. Fresh installs include no provider or extension. Rust host formatting, tests and lint run without Android SDK components. Building the app needs the Android SDK/NDK, Rust toolchain and `cargo-ndk`; this review computer lacks them, so Android compilation, APK creation and device verification are pending. No SDK license is accepted automatically, and no release/publication is part of this review.

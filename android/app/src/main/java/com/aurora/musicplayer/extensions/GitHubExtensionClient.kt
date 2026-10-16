@@ -3,11 +3,10 @@
 
 package com.aurora.musicplayer.extensions
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -32,12 +31,18 @@ class GitHubExtensionClient {
     suspend fun scan(repositoryUrl: String): List<RemoteExtensionPreview> = withContext(Dispatchers.IO) {
         val repository = parseRepositoryUrl(repositoryUrl)
         val sourceUrl = "https://github.com/${repository.owner}/${repository.name}"
-        val directoryUrl = "https://api.github.com/repos/${repository.owner}/${repository.name}/contents/aurora-extensions"
-        val listing = get(directoryUrl, raw = false)
+        val folderAndListing = listOf("nextvibe-sources", "aurora-extensions").firstNotNullOfOrNull { folder ->
+            try {
+                folder to get("https://api.github.com/repos/${repository.owner}/${repository.name}/contents/$folder", raw = false)
+            } catch (error: IOException) {
+                if (error.message?.contains("not found", ignoreCase = true) == true) null else throw error
+            }
+        } ?: throw IOException("No nextvibe-sources/ folder found (legacy aurora-extensions/ is also checked).")
+        val (folder, listing) = folderAndListing
         val entries = try {
             JSONArray(listing)
         } catch (_: Exception) {
-            throw IOException("GitHub returned an unexpected extension directory response.")
+            throw IOException("GitHub returned an unexpected source directory response.")
         }
 
         val files = (0 until entries.length()).mapNotNull { index ->
@@ -46,20 +51,16 @@ class GitHubExtensionClient {
             val path = item.optString("path")
             val size = item.optLong("size", -1)
             if (item.optString("type") != "file" || !name.endsWith(".aurora.json", ignoreCase = true)) return@mapNotNull null
-            require(path.startsWith("aurora-extensions/") && !path.split('/').any { it == ".." }) {
-                "GitHub returned an invalid extension path."
+            require(path.startsWith("$folder/") && !path.split('/').any { it == ".." }) {
+                "GitHub returned an invalid source manifest path."
             }
-            require(size in 1..MAX_EXTENSION_BYTES.toLong()) {
-                "${name.take(80)} exceeds the 64 KiB extension file limit."
-            }
+            require(size in 1..MAX_EXTENSION_BYTES.toLong()) { "${name.take(80)} exceeds the 64 KiB manifest limit." }
             name to path
         }.sortedBy { it.first.lowercase() }
 
-        if (files.isEmpty()) {
-            throw IOException("No .aurora.json files found. Add extension manifests to the repository's aurora-extensions/ folder.")
-        }
+        if (files.isEmpty()) throw IOException("No .aurora.json source manifests found in $folder/.")
         require(files.size <= MAX_EXTENSION_FILES) {
-            "This repository contains more than $MAX_EXTENSION_FILES extension files. Keep catalogs small to respect GitHub's public API limits."
+            "This repository contains more than $MAX_EXTENSION_FILES source manifests. Keep catalogs small to respect GitHub's public API limits."
         }
 
         files.map { (name, path) ->
@@ -78,7 +79,7 @@ class GitHubExtensionClient {
                     manifest = null,
                     rawJson = null,
                     sourceRepo = sourceUrl,
-                    error = error.message?.take(220) ?: "Could not load this extension file.",
+                    error = error.message?.take(220) ?: "Could not load this source manifest.",
                 )
             }
         }
@@ -107,7 +108,7 @@ class GitHubExtensionClient {
     }
 
     private fun get(url: String, raw: Boolean): String {
-        require(url.startsWith("https://api.github.com/")) { "Extension downloads must use GitHub's HTTPS API." }
+        require(url.startsWith("https://api.github.com/")) { "Source downloads must use GitHub's HTTPS API." }
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 8_000
@@ -115,14 +116,14 @@ class GitHubExtensionClient {
             instanceFollowRedirects = false
             setRequestProperty("Accept", if (raw) "application/vnd.github.raw+json" else "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            setRequestProperty("User-Agent", "GoVibe-Android/0.2")
+            setRequestProperty("User-Agent", "NextVibe-Android/0.3")
         }
         try {
             val status = connection.responseCode
             if (status !in 200..299) {
                 throw IOException(
                     when {
-                        status == 404 -> "Repository or aurora-extensions/ folder not found. Public repositories only."
+                        status == 404 -> "Repository or source directory not found. Public repositories only."
                         status == 403 || status == 429 -> "GitHub public API rate limit reached. Try again after the reset time."
                         else -> "GitHub request failed with HTTP $status."
                     },

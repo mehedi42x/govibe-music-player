@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -62,14 +63,167 @@ import com.aurora.musicplayer.extensions.ExtensionRepository
 import com.aurora.musicplayer.extensions.GitHubExtensionClient
 import com.aurora.musicplayer.extensions.InstalledExtensionProfile
 import com.aurora.musicplayer.extensions.RemoteExtensionPreview
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
-fun ExtensionsScreen(extensions: ExtensionRepository) {
+fun SettingsScreen(
+    extensions: ExtensionRepository,
+    installed: List<InstalledExtensionProfile>,
+    activeProfile: InstalledExtensionProfile?,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
+    libraryCount: Int,
+    onClearLibrary: () -> Unit,
+    shuffleEnabled: Boolean,
+    onShuffleEnabledChange: (Boolean) -> Unit,
+    repeatMode: Int,
+    onRepeatModeChange: (Int) -> Unit,
+    playbackVolume: Float,
+    onPlaybackVolumeChange: (Float) -> Unit,
+    volumeBoostDb: Float,
+    onVolumeBoostChange: (Float) -> Unit,
+    equalizerPreset: Int,
+    onEqualizerPresetChange: (Int) -> Unit,
+) {
+    var showClearDialog by remember { mutableStateOf(false) }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        SettingsToggleCard(
+            title = "Dark appearance",
+            description = "A calm, deep-colour listening space.",
+            checked = darkTheme,
+            onCheckedChange = onDarkThemeChange,
+        )
+        AudioSettingsCard(
+            volume = playbackVolume,
+            onVolumeChange = onPlaybackVolumeChange,
+            boostDb = volumeBoostDb,
+            onBoostChange = onVolumeBoostChange,
+            equalizerPreset = equalizerPreset,
+            onEqualizerPresetChange = onEqualizerPresetChange,
+        )
+        ExtensionManagerSection(extensions, installed, activeProfile)
+        SettingsToggleCard(
+            title = "Shuffle",
+            description = "Randomize playback navigation.",
+            checked = shuffleEnabled,
+            onCheckedChange = onShuffleEnabledChange,
+        )
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Repeat", fontWeight = FontWeight.SemiBold)
+                listOf(
+                    NativePlaybackCore.REPEAT_OFF to "Off",
+                    NativePlaybackCore.REPEAT_ALL to "All tracks",
+                    NativePlaybackCore.REPEAT_ONE to "Current track",
+                ).forEach { (mode, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = repeatMode == mode, onClick = { onRepeatModeChange(mode) })
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Text("Queue navigation uses the app's local playback core.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Privacy and source access", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Text("NextVibe sends catalogue requests only to the source you select. Your search terms go to that source; listening history and personal recommendations stay on this device. Audio-read permission is requested only for device scans. Downloads go to Music/NextVibe; Android 10+ uses scoped MediaStore, while Android 9 and below ask for write access only when you download.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("A download button appears only when the selected source manifest declares downloadsAllowed=true. That declaration is the source's claim, not a legal check. Sources cannot run code, request credentials, read your library, or replace NextVibe screens; no provider is bundled.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Local library", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("$libraryCount indexed local audio entries, including device scans and offline copies. Clearing removes the app's index and listening history; original files and completed copies in Music/NextVibe are not deleted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = { showClearDialog = true }, enabled = libraryCount > 0) { Text("Clear library and history") }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Clear library and history?") },
+            text = { Text("This removes local library index entries plus local and source listening history. Original audio files, completed downloads in Music/NextVibe and installed sources are not deleted.") },
+            confirmButton = {
+                Button(onClick = {
+                    onClearLibrary()
+                    showClearDialog = false
+                }) { Text("Clear data") }
+            },
+            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun AudioSettingsCard(
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    boostDb: Float,
+    onBoostChange: (Float) -> Unit,
+    equalizerPreset: Int,
+    onEqualizerPresetChange: (Int) -> Unit,
+) {
+    val presets = listOf(0 to "Flat", 1 to "Bass", 2 to "Vocal", 3 to "Treble")
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Audio controls", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Player volume · ${(volume * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+            Slider(value = volume, onValueChange = onVolumeChange, valueRange = 0f..1f, steps = 19)
+            Text("Volume boost · $boostDb dB", style = MaterialTheme.typography.bodySmall)
+            Slider(value = boostDb, onValueChange = onBoostChange, valueRange = 0f..3f, steps = 5)
+            Text("Boost is off by default and capped at +3 dB. Higher gain can clip audio; start low and reduce device volume if needed.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Text("Equalizer", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+            presets.chunked(2).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (value, label) ->
+                        FilterChip(
+                            selected = equalizerPreset == value,
+                            onClick = { onEqualizerPresetChange(value) },
+                            label = { Text(label) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            Text("Equalizer effects depend on Android device support and apply to this player's audio session.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleCard(title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+@Composable
+private fun ExtensionManagerSection(
+    extensions: ExtensionRepository,
+    installed: List<InstalledExtensionProfile>,
+    activeProfile: InstalledExtensionProfile?,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val installed by extensions.observeInstalled().collectAsState(initial = emptyList())
-    val active by extensions.observeActive().collectAsState(initial = null)
     val importer = remember { GitHubExtensionClient() }
     var repositoryUrl by rememberSaveable { mutableStateOf("") }
     var remote by remember { mutableStateOf<List<RemoteExtensionPreview>>(emptyList()) }
@@ -79,15 +233,14 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
     var editorText by remember { mutableStateOf(ExtensionManifestParser.template()) }
     var editorError by remember { mutableStateOf<String?>(null) }
     var editorPreview by remember { mutableStateOf<ExtensionManifest?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    val enabledSources = installed.filter { it.enabled && it.manifest.source != null }
 
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Extension studio", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("One .aurora.json file adds one inspectable home profile.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Music sources", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Choose a catalogue; NextVibe owns the screens and playback controls.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = {
                 editorText = ExtensionManifestParser.template()
@@ -95,17 +248,17 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
                 editorPreview = null
                 editorOpen = true
             }) {
-                Icon(Icons.Default.Add, contentDescription = "Add extension from JSON")
+                Icon(Icons.Default.Add, contentDescription = "Add a music source")
             }
         }
 
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Browse a public GitHub repository", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Add a source from GitHub", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
-                Text("GoVibe scans aurora-extensions/ for separate .aurora.json files. Nothing is downloaded until you scan; each valid file is previewed before you add it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Scan a public repository's nextvibe-sources/ folder for JSON manifests. Each result is previewed before installation; nothing is added until you choose it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = repositoryUrl,
                     onValueChange = { repositoryUrl = it },
@@ -123,6 +276,8 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
                             scope.launch {
                                 try {
                                     remote = importer.scan(repositoryUrl)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (error: Exception) {
                                     scanError = error.message ?: "Could not scan this repository."
                                 } finally {
@@ -136,73 +291,90 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
                         else Icon(Icons.Default.Refresh, contentDescription = null)
                         Text(if (loading) "Scanning" else "Scan repository", modifier = Modifier.padding(start = 8.dp))
                     }
-                    Text("Public repositories only · no GitHub sign-in", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Public repos only · no sign-in", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 scanError?.let { InlineMessage(it, isError = true) }
                 if (remote.isNotEmpty()) {
                     HorizontalDivider()
-                    Text("Found ${remote.size} extension file${if (remote.size == 1) "" else "s"}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Found ${remote.size} manifest${if (remote.size == 1) "" else "s"}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     remote.forEach { preview ->
-                        RemoteExtensionCard(
+                        RemoteSourceCard(
                             preview = preview,
                             onAdd = {
-                                val manifestJson = preview.rawJson ?: return@RemoteExtensionCard
+                                val raw = preview.rawJson ?: return@RemoteSourceCard
                                 scope.launch {
                                     try {
-                                        extensions.installCommunity(manifestJson, preview.sourceRepo)
+                                        extensions.installCommunity(raw, preview.sourceRepo)
                                         Toast.makeText(context, "${preview.manifest?.name} added", Toast.LENGTH_SHORT).show()
                                     } catch (error: Exception) {
-                                        scanError = error.message ?: "Could not add this extension."
+                                        scanError = error.message ?: "Could not add this source."
                                     }
                                 }
                             },
                         )
                     }
                 }
-                Text("GitHub's unauthenticated API is rate-limited. A scan is capped at 20 extension files and is only started when you tap Scan.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("GitHub public API limits apply. A scan checks up to 20 small JSON files and does not run downloaded code.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        Text("Installed extensions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        if (installed.isEmpty()) {
-            Text("No extensions are installed. GoVibe uses its own default home; add a profile with + or scan a public GitHub repository.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Active catalogue", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = activeProfile == null || activeProfile.manifest.source == null, onClick = { extensions.clearActive() })
+                    Column(Modifier.weight(1f)) {
+                        Text("No remote source", fontWeight = FontWeight.Medium)
+                        Text("Keep Home focused on your local library.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (enabledSources.isEmpty()) {
+                    Text("No source installed. Add a JSON manifest above; no music provider comes preinstalled.", modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                enabledSources.forEach { profile ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = profile.manifest.id == activeProfile?.manifest?.id,
+                            onClick = { scope.launch { runCatching { extensions.setActive(profile.manifest.id) }.onFailure { actionError = it.message } } },
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(profile.manifest.name, fontWeight = FontWeight.Medium)
+                            Text("${profile.manifest.author} · v${profile.manifest.version}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (profile.manifest.id == activeProfile?.manifest?.id) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "Selected source", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (installed.isNotEmpty()) {
+            Text("Installed sources", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             installed.forEach { profile ->
-                InstalledExtensionCard(
+                InstalledSourceCard(
                     profile = profile,
-                    isActive = profile.manifest.id == active?.manifest?.id,
+                    active = profile.manifest.id == activeProfile?.manifest?.id,
                     onEnabledChange = { enabled ->
-                        scope.launch {
-                            runCatching { extensions.setEnabled(profile.manifest.id, enabled) }
-                                .onFailure { scanError = it.message }
-                        }
+                        scope.launch { runCatching { extensions.setEnabled(profile.manifest.id, enabled) }.onFailure { actionError = it.message } }
                     },
-                    onSetActive = {
-                        scope.launch {
-                            runCatching { extensions.setActive(profile.manifest.id) }
-                                .onFailure { scanError = it.message }
-                        }
-                    },
-                    onUninstall = {
-                        scope.launch {
-                            runCatching { extensions.uninstall(profile.manifest.id) }
-                                .onFailure { scanError = it.message }
-                        }
+                    onRemove = {
+                        scope.launch { runCatching { extensions.uninstall(profile.manifest.id) }.onFailure { actionError = it.message } }
                     },
                 )
             }
         }
-        SafeFormatNotice()
-        Spacer(Modifier.height(12.dp))
+        actionError?.let { InlineMessage(it, isError = true) }
+        SourceSafetyNotice()
     }
 
     if (editorOpen) {
         AlertDialog(
             onDismissRequest = { editorOpen = false },
-            title = { Text("Add from manifest") },
+            title = { Text("Add source manifest") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.heightIn(max = 540.dp).verticalScroll(rememberScrollState())) {
-                    Text("Edit the JSON template below. This is a declarative UI profile, not executable Kotlin or JavaScript.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("This JSON describes HTTPS search and trending endpoints using the NextVibe song-data contract. It cannot provide screens or executable code.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(
                         value = editorText,
                         onValueChange = { editorText = it; editorError = null; editorPreview = null },
@@ -226,7 +398,7 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
                         }
                     }) { Text("Validate") }
                     Button(
-                        enabled = editorPreview != null,
+                        enabled = editorPreview?.source != null,
                         onClick = {
                             val manifest = editorPreview ?: return@Button
                             scope.launch {
@@ -235,11 +407,11 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
                                     Toast.makeText(context, "${manifest.name} added", Toast.LENGTH_SHORT).show()
                                     editorOpen = false
                                 } catch (error: Exception) {
-                                    editorError = error.message ?: "Could not add this extension."
+                                    editorError = error.message ?: "Could not add this source."
                                 }
                             }
                         },
-                    ) { Text("Add") }
+                    ) { Text("Add source") }
                 }
             },
             dismissButton = { TextButton(onClick = { editorOpen = false }) { Text("Cancel") } },
@@ -248,177 +420,23 @@ fun ExtensionsScreen(extensions: ExtensionRepository) {
 }
 
 @Composable
-fun SettingsScreen(
-    extensions: ExtensionRepository,
-    installed: List<InstalledExtensionProfile>,
-    activeProfile: InstalledExtensionProfile?,
-    darkTheme: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit,
-    libraryCount: Int,
-    onClearLibrary: () -> Unit,
-    shuffleEnabled: Boolean,
-    onShuffleEnabledChange: (Boolean) -> Unit,
-    repeatMode: Int,
-    onRepeatModeChange: (Int) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    var showClearDialog by remember { mutableStateOf(false) }
-    var actionError by remember { mutableStateOf<String?>(null) }
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Dark appearance", fontWeight = FontWeight.SemiBold)
-                    Text("Use GoVibe's dark-first palette.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange)
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Shuffle", fontWeight = FontWeight.SemiBold)
-                    Text("Randomize playback navigation.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = shuffleEnabled, onCheckedChange = onShuffleEnabledChange)
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Repeat", fontWeight = FontWeight.SemiBold)
-                listOf(
-                    NativePlaybackCore.REPEAT_OFF to "Off",
-                    NativePlaybackCore.REPEAT_ALL to "All tracks",
-                    NativePlaybackCore.REPEAT_ONE to "Current track",
-                ).forEach { (mode, label) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = repeatMode == mode, onClick = { onRepeatModeChange(mode) })
-                        Text(label, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-                Text("Queue navigation is calculated by GoVibe's Rust playback core.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Home appearance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Choose an installed profile or return to GoVibe's own app home. No extension is installed by default.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = activeProfile == null,
-                        onClick = { extensions.clearActive() },
-                    )
-                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text("GoVibe default home", fontWeight = FontWeight.SemiBold)
-                        Text("The app's own layout; not an extension.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            installed.forEach { profile ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = profile.manifest.id == activeProfile?.manifest?.id,
-                            onClick = {
-                                if (profile.enabled) scope.launch {
-                                    runCatching { extensions.setActive(profile.manifest.id) }.onFailure { actionError = it.message }
-                                }
-                            },
-                            enabled = profile.enabled,
-                        )
-                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                            Text(profile.manifest.name, fontWeight = FontWeight.SemiBold)
-                            Text("${profile.manifest.author} · v${profile.manifest.version}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(profile.manifest.presentation.homeSubtitle, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Switch(checked = profile.enabled, onCheckedChange = { enabled -> scope.launch {
-                            runCatching { extensions.setEnabled(profile.manifest.id, enabled) }.onFailure { actionError = it.message }
-                        } })
-                    }
-                }
-            }
-        }
-
-        activeProfile?.let { profile ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("Active profile information", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    ManifestSummary(profile.manifest)
-                    Text("Installed from: ${profile.sourceRepo}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Audio and privacy", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                }
-                Text("GoVibe plays user-selected local audio through Android Media3. It does not re-encode the source in-app; actual output depends on the device decoder and audio route. Bit-perfect output is not measured.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("The only network feature is an explicit public GitHub extension scan. No token, account cookie, or audio-file upload is used.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Local library", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("$libraryCount imported audio entries. Removing the library clears GoVibe's index and history; the original files are not deleted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = { showClearDialog = true }, enabled = libraryCount > 0) { Text("Clear library index") }
-            }
-        }
-        actionError?.let { InlineMessage(it, isError = true) }
-        Spacer(Modifier.height(16.dp))
-    }
-
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear library index?") },
-            text = { Text("This removes imported track entries and listening history from GoVibe. Your original audio files will not be deleted.") },
-            confirmButton = {
-                Button(onClick = {
-                    onClearLibrary()
-                    showClearDialog = false
-                }) { Text("Clear index") }
-            },
-            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Cancel") } },
-        )
-    }
-}
-
-@Composable
-private fun RemoteExtensionCard(preview: RemoteExtensionPreview, onAdd: () -> Unit) {
+private fun RemoteSourceCard(preview: RemoteExtensionPreview, onAdd: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(18.dp)) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (preview.manifest == null) {
                 Text(preview.fileName, fontWeight = FontWeight.SemiBold)
-                InlineMessage(preview.error ?: "Invalid extension file.", isError = true)
+                InlineMessage(preview.error ?: "Invalid source manifest.", isError = true)
             } else {
                 ManifestSummary(preview.manifest)
                 Text("File: ${preview.fileName}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onAdd, modifier = Modifier.align(Alignment.End)) { Text("Add extension") }
+                OutlinedButton(onClick = onAdd, modifier = Modifier.align(Alignment.End), enabled = preview.manifest.source != null) { Text("Add source") }
             }
         }
     }
 }
 
 @Composable
-private fun InstalledExtensionCard(
-    profile: InstalledExtensionProfile,
-    isActive: Boolean,
-    onEnabledChange: (Boolean) -> Unit,
-    onSetActive: () -> Unit,
-    onUninstall: () -> Unit,
-) {
+private fun InstalledSourceCard(profile: InstalledExtensionProfile, active: Boolean, onEnabledChange: (Boolean) -> Unit, onRemove: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -430,15 +448,28 @@ private fun InstalledExtensionCard(
                 Switch(checked = profile.enabled, onCheckedChange = onEnabledChange)
             }
             Text(profile.manifest.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onUninstall) { Text("Remove") }
-                if (isActive) {
+            Text(
+                if (profile.manifest.source == null) "Legacy display profile — not a music source."
+                else "Source: ${profile.manifest.source.baseUrl}",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (profile.manifest.source != null) {
+                Text(
+                    "Offline downloads: ${if (profile.manifest.source.downloadsAllowed) "allowed by source manifest" else "not enabled"} · source declaration is not a rights verification",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onRemove) { Text("Remove") }
+                if (active) {
                     FilledTonalButton(onClick = {}, enabled = false) {
                         Icon(Icons.Default.CheckCircle, null)
                         Text("Active", modifier = Modifier.padding(start = 6.dp))
                     }
-                } else {
-                    TextButton(onClick = onSetActive, enabled = profile.enabled) { Text("Set as home") }
                 }
             }
         }
@@ -451,22 +482,29 @@ private fun ManifestSummary(manifest: ExtensionManifest) {
         Text(manifest.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Text("${manifest.author} · v${manifest.version}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(manifest.description, style = MaterialTheme.typography.bodySmall)
-        Text("Home title: ${manifest.presentation.homeTitle}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Accent: ${manifest.presentation.accentColor} · ${manifest.capabilities.joinToString()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        manifest.presentation.details.forEach { detail ->
-            Text("${detail.label}: ${detail.value}", style = MaterialTheme.typography.bodySmall)
+        Text(
+            manifest.source?.let { "HTTPS catalogue · search + trending" } ?: "Legacy display-only manifest",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        manifest.source?.let {
+            Text(
+                if (it.downloadsAllowed) "Offline download requests enabled by this source" else "Offline downloads disabled by this source",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun SafeFormatNotice() {
+private fun SourceSafetyNotice() {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Constrained by design", fontWeight = FontWeight.SemiBold)
-                Text("Extensions can set an accent color and plain-text home details only. They cannot run code, read your music, request credentials, call arbitrary APIs, or provide audio streams.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Source-only by design", fontWeight = FontWeight.SemiBold)
+                Text("A source returns a tracks array with stable IDs, title, artist, album, description, HTTPS artwork and HTTPS playable URL. NextVibe renders the list, thumbnail, search and player; manifests cannot inject UI, code, credentials or local-file access.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -15,7 +15,7 @@ class ExtensionRepository(
     context: Context,
     private val dao: ExtensionDao,
 ) {
-    private val preferences = context.getSharedPreferences("aurora-extension-settings", Context.MODE_PRIVATE)
+    private val preferences = context.getSharedPreferences("nextvibe-source-settings", Context.MODE_PRIVATE)
     private val storedActiveId = preferences.getString(KEY_ACTIVE_EXTENSION, null)
     private val activeId = MutableStateFlow(storedActiveId?.takeUnless { it.startsWith(RESERVED_ID_PREFIX) })
 
@@ -31,23 +31,29 @@ class ExtensionRepository(
 
     fun observeActive(): Flow<InstalledExtensionProfile?> = combine(dao.observeAll(), activeId) { rows, selectedId ->
         val profiles = rows.mapNotNull(::toProfile)
-        profiles.firstOrNull { it.manifest.id == selectedId && it.enabled }
+        profiles.firstOrNull { it.manifest.id == selectedId && it.enabled && it.manifest.source != null }
     }
 
-    /** Removes profiles bundled by older development builds; new installs never seed extensions. */
+    /** Removes profiles bundled by older development builds; fresh installs never seed sources. */
     suspend fun cleanupLegacyBundledProfiles() {
         dao.removeBuiltIns()
         val selected = activeId.value ?: return
-        if (dao.find(selected)?.enabled != true) clearActive()
+        val validSource = dao.find(selected)?.let(::toProfile)?.let {
+            it.enabled && it.manifest.source != null
+        } == true
+        if (!validSource) clearActive()
     }
 
     suspend fun installCommunity(rawJson: String, sourceRepo: String): ExtensionManifest {
         val manifest = ExtensionManifestParser.parse(rawJson)
+        require(manifest.source != null && "music.source" in manifest.capabilities) {
+            "Only declarative music.source manifests can be installed. Legacy presentation profiles are read-only."
+        }
         require(!manifest.id.startsWith(RESERVED_ID_PREFIX)) {
-            "Community extensions may not use GoVibe's reserved org.aurora.* IDs."
+            "Community sources may not use NextVibe's reserved org.aurora.* IDs."
         }
         require(dao.find(manifest.id) == null) {
-            "This extension ID is already installed. Uninstall it before adding another copy."
+            "This source ID is already installed. Remove it before adding another copy."
         }
         dao.put(
             InstalledExtensionEntity(
@@ -62,15 +68,16 @@ class ExtensionRepository(
     }
 
     suspend fun setEnabled(id: String, enabled: Boolean) {
-        require(dao.find(id) != null) { "Extension is not installed." }
+        require(dao.find(id) != null) { "Source is not installed." }
         dao.setEnabled(id, enabled)
         if (!enabled && activeId.value == id) clearActive()
     }
 
     suspend fun setActive(id: String) {
         val profile = dao.find(id)?.let(::toProfile)
-            ?: throw IllegalArgumentException("Extension is not installed.")
-        require(profile.enabled) { "Enable this extension before selecting it as the active home profile." }
+            ?: throw IllegalArgumentException("Source is not installed.")
+        require(profile.enabled) { "Enable this source before selecting it." }
+        require(profile.manifest.source != null) { "Only a music source can be selected for the Home feed." }
         activeId.value = id
         preferences.edit().putString(KEY_ACTIVE_EXTENSION, id).apply()
     }
@@ -96,7 +103,7 @@ class ExtensionRepository(
     }.getOrNull()
 
     companion object {
-        private const val KEY_ACTIVE_EXTENSION = "active-extension-id"
+        private const val KEY_ACTIVE_EXTENSION = "active-source-id"
         private const val RESERVED_ID_PREFIX = "org.aurora."
     }
 }

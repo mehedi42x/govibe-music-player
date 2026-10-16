@@ -1,4 +1,4 @@
-name: GoVibe experimental debug APK
+name: NextVibe experimental debug APK
 on:
   workflow_dispatch:
     inputs:
@@ -30,7 +30,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$n" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$n" >> "$GITHUB_ENV"
       - run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android && cargo install cargo-ndk --locked
-      - run: ./gradlew --no-daemon --stacktrace :app:assembleDebug
+      - run: ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
         working-directory: android
       - run: |
           set -eu
@@ -43,10 +43,11 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name }}
-          name: GoVibe 0.2.0-native-review - Experimental Debug APK
+          name: NextVibe 0.3.0-nextvibe-preview - Experimental Debug APK
           body: |
-            EXPERIMENTAL TEST BUILD — DEBUG-SIGNED; NOT FOR PRODUCTION.
-            Android auto-generated debug key. SHA-256 in SHA256SUMS.txt.
+            EXPERIMENTAL TEST BUILD — DRAFT, DEBUG-SIGNED; NOT FOR PRODUCTION.
+            This build uses Gradle's auto-generated Android debug key for review only.
+            SHA-256 in SHA256SUMS.txt. Do not distribute as a production build.
           draft: true
           files: |
             android/app/build/outputs/apk/debug/app-debug.apk

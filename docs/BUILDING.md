@@ -1,4 +1,4 @@
-# Building GoVibe
+# Building NextVibe
 
 ## Rust host checks
 
@@ -10,33 +10,23 @@ cargo test --manifest-path rust/govibe-core/Cargo.toml
 cargo clippy --manifest-path rust/govibe-core/Cargo.toml --all-targets -- -D warnings
 ```
 
-The crate uses only the Rust standard library. `cargo test` writes a lockfile alongside the crate; commit it with source changes to keep builds reproducible.
+The crate uses only the Rust standard library.
 
-## Build a local Android debug APK
+## Android debug APK
 
-### Requirements
-
-- JDK 17 or newer.
-- Android SDK Platform/API 36 and Android Build-Tools 36.0.0.
-- Android NDK (the Gradle app module pins the expected NDK version).
-- Rust/Cargo and `cargo-ndk` (`cargo install cargo-ndk`).
-- The checked-in Gradle wrapper and Android Gradle Plugin versions pinned in `android/`.
-
-Install SDK/NDK components through Android Studio's SDK Manager or official command-line tools only after reviewing the applicable license terms. Do not use unattended license acceptance. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT`, plus `ANDROID_NDK_HOME` (or `ANDROID_NDK_ROOT`), then run:
+Requirements include JDK 17+, Android SDK Platform/API 37, Build-Tools 36.0.0, the pinned NDK, Rust/Cargo, and `cargo-ndk`. Review SDK/NDK license terms before installing. Do not use unattended license acceptance. After provisioning prerequisites, set `ANDROID_HOME` or `ANDROID_SDK_ROOT` and `ANDROID_NDK_HOME` or `ANDROID_NDK_ROOT`, then run:
 
 ```bash
 cd android
-./gradlew assembleDebug
+./gradlew testDebugUnitTest assembleDebug
 ```
 
-Gradle runs `buildRustCore`, which invokes `scripts/build-android-rust.sh` to compile `rust/govibe-core` for the Android ABIs configured in `android/app/build.gradle`. The generated `libgovibe_core.so` libraries are packaged in the local debug APK.
-
-Expected output: `android/app/build/outputs/apk/debug/app-debug.apk`. This is a local debug-signed test build, not a release; no signing credentials or public artifact are included.
+Gradle invokes `scripts/build-android-rust.sh` for the configured Android ABIs. The local debug APK is expected at `android/app/build/outputs/apk/debug/app-debug.apk`; it is not a release.
 
 ## Review environment limits
 
-The review computer has Rust/Cargo but no Android SDK/NDK, Android Rust target, or `cargo-ndk`. SDK licenses have not been accepted. Therefore this environment can run Rust host checks but cannot compile the Android app, create an APK, or verify device/JNI ABI behavior. Android build/device verification remains explicitly pending.
+This review computer has Rust/Cargo but no Android SDK/NDK, Android Rust target, or `cargo-ndk`. SDK licenses have not been accepted. Rust checks, schema validation, and source-level checks are available; Android Kotlin/Room/Compose compilation, APK creation, and device verification are pending. Do not install SDK components or accept licenses as part of this review.
 
-## Dependency and license policy
+## License and dependency policy
 
-GoVibe-authored code in this local review revision is licensed under GPL-3.0-only. Android dependency versions are pinned in Gradle build files; the Rust crate currently has no third-party dependencies. Third-party libraries and Gradle wrapper scripts retain their own license terms and notices. Earlier publicly distributed copies under 0BSD remain subject to that prior grant; see [License](../LICENSE) and the historical [license decision](decisions/0001-browser-pwa-and-license.md).
+Project-authored code in this review revision is GPL-3.0-only. Third-party Android dependencies and the Gradle wrapper retain their own licenses and notices. No runtime dependency has been added for the source feature; it uses Android/Java networking and the existing Compose/Media3 stack. Earlier public copies retain the permissions of their earlier license grant.

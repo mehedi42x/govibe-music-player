@@ -11,7 +11,12 @@ import com.aurora.musicplayer.extensions.ExtensionRepository
 class AuroraApplication : Application() {
     val database by lazy { AuroraDatabase.get(this) }
     val library by lazy {
-        AudioLibraryRepository(this, database.audioTrackDao(), database.playbackHistoryDao())
+        AudioLibraryRepository(
+            this,
+            database.audioTrackDao(),
+            database.playbackHistoryDao(),
+            database.remotePlaybackHistoryDao(),
+        )
     }
     val extensions by lazy {
         ExtensionRepository(this, database.extensionDao())

@@ -23,6 +23,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.aurora.musicplayer.core.NativePlaybackCore
 import com.aurora.musicplayer.data.AudioTrackEntity
+import com.aurora.musicplayer.data.CatalogTrack
 import com.aurora.musicplayer.playback.PlaybackService
 import com.aurora.musicplayer.ui.AuroraApp
 import com.google.common.util.concurrent.ListenableFuture
@@ -33,6 +34,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var app: AuroraApplication
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var pendingPlayback: (() -> Unit)? = null
+    private var lastRecordedMediaId: String? = null
+
+    private val historyListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            recordMediaItem(mediaItem)
+        }
+    }
 
     private val audioPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNullOrEmpty()) return@registerForActivityResult
@@ -56,11 +64,16 @@ class MainActivity : ComponentActivity() {
         pendingPlayback = null
     }
 
+    private val audioReadPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) scanDeviceAudioNow()
+        else Toast.makeText(this, "Allow audio access to scan music on this device.", Toast.LENGTH_LONG).show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         app = application as AuroraApplication
-        window.statusBarColor = android.graphics.Color.rgb(11, 16, 32)
-        window.navigationBarColor = android.graphics.Color.rgb(11, 16, 32)
+        window.statusBarColor = android.graphics.Color.rgb(8, 13, 25)
+        window.navigationBarColor = android.graphics.Color.rgb(8, 13, 25)
 
         lifecycleScope.launch { app.extensions.cleanupLegacyBundledProfiles() }
         connectPlaybackController()
@@ -71,10 +84,38 @@ class MainActivity : ComponentActivity() {
                 extensions = app.extensions,
                 player = controllerState.value,
                 onImportAudio = { audioPicker.launch(arrayOf("audio/*")) },
+                onScanDeviceAudio = ::requestDeviceAudioScan,
+                onAudioSettingsChange = { volume, boostDb, preset -> PlaybackService.updateAudioSettings(volume, boostDb, preset) },
                 onPlayQueue = ::playQueue,
+                onPlayRemoteQueue = ::playRemoteQueue,
                 onSkipNext = ::skipNext,
                 onSkipPrevious = ::skipPrevious,
             )
+        }
+    }
+
+    private fun requestDeviceAudioScan() {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            scanDeviceAudioNow()
+        } else {
+            audioReadPermission.launch(permission)
+        }
+    }
+
+    private fun scanDeviceAudioNow() {
+        lifecycleScope.launch {
+            runCatching { app.library.scanDeviceAudio() }
+                .onSuccess { count ->
+                    Toast.makeText(this@MainActivity, "Found $count audio file${if (count == 1) "" else "s"} on this device.", Toast.LENGTH_SHORT).show()
+                }
+                .onFailure { error ->
+                    Toast.makeText(this@MainActivity, error.message ?: "Could not scan device audio.", Toast.LENGTH_LONG).show()
+                }
         }
     }
 
@@ -83,7 +124,13 @@ class MainActivity : ComponentActivity() {
         val future = MediaController.Builder(this, token).buildAsync()
         controllerFuture = future
         future.addListener(
-            { runCatching { future.get() }.onSuccess { controllerState.value = it } },
+            {
+                runCatching { future.get() }.onSuccess { controller ->
+                    controllerState.value = controller
+                    controller.addListener(historyListener)
+                    recordMediaItem(controller.currentMediaItem)
+                }
+            },
             ContextCompat.getMainExecutor(this),
         )
     }
@@ -113,7 +160,7 @@ class MainActivity : ComponentActivity() {
             controller.setMediaItems(items, safeIndex, 0L)
             controller.prepare()
             controller.play()
-            lifecycleScope.launch { app.library.recordPlayed(tracks[safeIndex].uri) }
+            recordMediaItem(controller.currentMediaItem)
         }
         if (
             Build.VERSION.SDK_INT >= 33 &&
@@ -123,6 +170,71 @@ class MainActivity : ComponentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             action()
+        }
+    }
+
+    private fun playRemoteQueue(tracks: List<CatalogTrack>, startIndex: Int) {
+        val controller = controllerState.value
+        if (controller == null || tracks.isEmpty()) {
+            Toast.makeText(this, "Player is still connecting. Try again in a moment.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
+        val items = tracks.map { track ->
+            MediaItem.Builder()
+                .setMediaId("$REMOTE_MEDIA_ID_PREFIX${track.sourceId}:${track.id}")
+                .setUri(Uri.parse(track.streamUrl))
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(track.title)
+                        .setArtist(track.artist)
+                        .setAlbumTitle(track.album)
+                        .setDescription(track.description)
+                        .setArtworkUri(track.artworkUrl.takeIf(String::isNotBlank)?.let(Uri::parse))
+                        .build(),
+                )
+                .build()
+        }
+        val action: () -> Unit = {
+            controller.setMediaItems(items, safeIndex, 0L)
+            controller.prepare()
+            controller.play()
+            recordMediaItem(controller.currentMediaItem)
+        }
+        if (
+            Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingPlayback = action
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            action()
+        }
+    }
+
+    private fun recordMediaItem(item: MediaItem?) {
+        item ?: return
+        val mediaId = item.mediaId
+        if (mediaId == lastRecordedMediaId) return
+        lastRecordedMediaId = mediaId
+        if (mediaId.startsWith(REMOTE_MEDIA_ID_PREFIX)) {
+            val identifiers = mediaId.removePrefix(REMOTE_MEDIA_ID_PREFIX).split(':', limit = 2)
+            if (identifiers.size != 2 || identifiers[1].isBlank()) return
+            val metadata = item.mediaMetadata
+            val track = CatalogTrack(
+                sourceId = identifiers[0],
+                id = identifiers[1],
+                title = metadata.title?.toString().orEmpty(),
+                artist = metadata.artist?.toString().orEmpty(),
+                album = metadata.albumTitle?.toString().orEmpty(),
+                description = metadata.description?.toString().orEmpty(),
+                artworkUrl = metadata.artworkUri?.toString().orEmpty(),
+                streamUrl = item.localConfiguration?.uri?.toString().orEmpty(),
+                durationMs = 0L,
+            )
+            lifecycleScope.launch { runCatching { app.library.recordRemotePlayed(track) } }
+        } else {
+            lifecycleScope.launch { runCatching { app.library.recordPlayed(mediaId) } }
         }
     }
 
@@ -155,9 +267,14 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        controllerState.value?.removeListener(historyListener)
         controllerState.value = null
         controllerFuture?.let(MediaController::releaseFuture)
         controllerFuture = null
         super.onDestroy()
+    }
+
+    private companion object {
+        const val REMOTE_MEDIA_ID_PREFIX = "nextvibe:"
     }
 }

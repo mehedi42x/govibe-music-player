@@ -27,6 +27,21 @@ interface AudioTrackDao {
     @Query("SELECT * FROM audio_tracks WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR album LIKE '%' || :query || '%' ORDER BY title COLLATE NOCASE ASC")
     fun search(query: String): Flow<List<AudioTrackEntity>>
 
+    @Query(
+        """SELECT a.* FROM audio_tracks AS a
+            LEFT JOIN play_history AS h ON a.uri = h.trackUri
+            GROUP BY a.uri
+            ORDER BY CASE WHEN LOWER(a.artist) IN (
+                SELECT LOWER(t.artist) FROM audio_tracks AS t
+                JOIN play_history AS ph ON ph.trackUri = t.uri
+                GROUP BY LOWER(t.artist)
+                ORDER BY COUNT(*) DESC, MAX(ph.playedAt) DESC LIMIT 4
+            ) THEN 0 ELSE 1 END,
+            MAX(h.playedAt) DESC, a.isFavorite DESC, a.importedAt DESC
+            LIMIT 12""",
+    )
+    fun observeRecommendations(): Flow<List<AudioTrackEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(track: AudioTrackEntity)
 
@@ -70,6 +85,9 @@ interface PlaybackHistoryDao {
     @Query("SELECT * FROM play_history ORDER BY playedAt DESC LIMIT 100")
     fun observeRecent(): Flow<List<PlaybackHistoryEntity>>
 
+    @Query("SELECT t.artist FROM audio_tracks AS t JOIN play_history AS h ON h.trackUri = t.uri GROUP BY LOWER(t.artist) ORDER BY COUNT(*) DESC, MAX(h.playedAt) DESC LIMIT 12")
+    fun observeTopArtists(): Flow<List<String>>
+
     @Insert
     suspend fun add(entry: PlaybackHistoryEntity)
 
@@ -77,6 +95,18 @@ interface PlaybackHistoryDao {
     suspend fun deleteOlderThan(olderThan: Long)
 
     @Query("DELETE FROM play_history")
+    suspend fun clear()
+}
+
+@Dao
+interface RemotePlaybackHistoryDao {
+    @Query("SELECT artist FROM remote_play_history GROUP BY LOWER(artist) ORDER BY COUNT(*) DESC, MAX(playedAt) DESC LIMIT 12")
+    fun observeTopArtists(): Flow<List<String>>
+
+    @Insert
+    suspend fun add(entry: RemotePlaybackHistoryEntity)
+
+    @Query("DELETE FROM remote_play_history")
     suspend fun clear()
 }
 

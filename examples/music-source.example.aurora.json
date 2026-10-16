@@ -1,0 +1,16 @@
+{
+  "format": "aurora-extension",
+  "formatVersion": 1,
+  "id": "org.example.music-source",
+  "name": "Example music source",
+  "version": "1.0.0",
+  "author": "Example author",
+  "description": "A provider-neutral example for a NextVibe-compatible catalogue API.",
+  "capabilities": ["music.source"],
+  "source": {
+    "baseUrl": "https://api.example.org",
+    "trendingPath": "/v1/trending",
+    "searchPath": "/v1/search?q={query}",
+    "downloadsAllowed": false
+  }
+}

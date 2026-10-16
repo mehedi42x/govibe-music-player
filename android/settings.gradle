@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'GoVibe'
+rootProject.name = 'NextVibe'
 include ':app'

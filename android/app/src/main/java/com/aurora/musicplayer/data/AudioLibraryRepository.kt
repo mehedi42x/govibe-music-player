@@ -11,16 +11,27 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 
 class AudioLibraryRepository(
     private val context: Context,
     private val tracks: AudioTrackDao,
     private val history: PlaybackHistoryDao,
+    private val remoteHistory: RemotePlaybackHistoryDao,
 ) {
     fun observeTracks(): Flow<List<AudioTrackEntity>> = tracks.observeAll()
     fun observeFavorites(): Flow<List<AudioTrackEntity>> = tracks.observeFavorites()
+    fun observeRecommendations(): Flow<List<AudioTrackEntity>> = tracks.observeRecommendations()
     fun search(query: String): Flow<List<AudioTrackEntity>> = tracks.search(query.trim())
+    suspend fun scanDeviceAudio(): Int = DeviceAudioScanner(context.contentResolver, tracks).scan()
+
+    fun observeTasteArtists(): Flow<List<String>> = combine(
+        history.observeTopArtists(),
+        remoteHistory.observeTopArtists(),
+    ) { local, remote ->
+        (remote + local).distinctBy { it.trim().lowercase() }.filter { it.isNotBlank() }.take(12)
+    }
 
     suspend fun import(uri: Uri): AudioTrackEntity = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
@@ -58,9 +69,43 @@ class AudioLibraryRepository(
         ).also { tracks.insert(it) }
     }
 
+    suspend fun downloadForOffline(
+        track: CatalogTrack,
+        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> },
+    ): AudioTrackEntity = withContext(Dispatchers.IO) {
+        require(track.downloadsAllowed) { "This music source has not enabled offline downloads." }
+        val downloaded = MusicTrackDownloader(context).download(track, onProgress)
+        val uri = downloaded.uri.toString()
+        val existing = tracks.find(uri)
+        AudioTrackEntity(
+            uri = uri,
+            title = track.title,
+            artist = track.artist,
+            album = track.album.ifBlank { "Unknown album" },
+            durationMs = track.durationMs,
+            mimeType = downloaded.mimeType,
+            importedAt = existing?.importedAt ?: System.currentTimeMillis(),
+            isFavorite = existing?.isFavorite ?: false,
+        ).also { tracks.insert(it) }
+    }
+
     suspend fun setFavorite(uri: String, favorite: Boolean) = tracks.setFavorite(uri, favorite)
     suspend fun remove(uri: String) = tracks.delete(uri)
     suspend fun recordPlayed(uri: String) = history.add(PlaybackHistoryEntity(trackUri = uri))
+    suspend fun recordRemotePlayed(track: CatalogTrack) {
+        remoteHistory.add(
+            RemotePlaybackHistoryEntity(
+                sourceId = track.sourceId,
+                trackId = track.id,
+                title = track.title,
+                artist = track.artist,
+                album = track.album,
+                artworkUrl = track.artworkUrl,
+                durationMs = track.durationMs,
+            ),
+        )
+    }
+
     suspend fun clearLibrary() {
         tracks.getAll().forEach { track ->
             runCatching {
@@ -72,6 +117,7 @@ class AudioLibraryRepository(
         }
         tracks.clear()
         history.clear()
+        remoteHistory.clear()
     }
 
     private fun displayName(resolver: ContentResolver, uri: Uri): String? =
