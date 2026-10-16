@@ -15,7 +15,7 @@ def rustBuildTask = tasks.register('buildRustCore', Exec) {
     group = 'build'
     description = 'Build the Rust playback engine for Android ABIs without accepting SDK licenses.'
     inputs.files(fileTree('../rust') { include '**/*' })
-    inputs.file('../scripts/build-android-rust.sh')
+    inputs.file('../../scripts/build-android-rust.sh')
     inputs.property('rustBuildProfile', rustBuildProfile)
     outputs.dir(rustJniOutput)
     commandLine 'bash', rootProject.file('../scripts/build-android-rust.sh').absolutePath, rustJniOutput.get().asFile.absolutePath, rustBuildProfile
