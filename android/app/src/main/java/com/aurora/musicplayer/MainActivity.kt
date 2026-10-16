@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Mehedi Hasan
+// SPDX-License-Identifier: GPL-3.0-only
+
 package com.aurora.musicplayer
 
 import android.Manifest
@@ -18,6 +21,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.aurora.musicplayer.core.NativePlaybackCore
 import com.aurora.musicplayer.data.AudioTrackEntity
 import com.aurora.musicplayer.playback.PlaybackService
 import com.aurora.musicplayer.ui.AuroraApp
@@ -68,6 +72,8 @@ class MainActivity : ComponentActivity() {
                 player = controllerState.value,
                 onImportAudio = { audioPicker.launch(arrayOf("audio/*")) },
                 onPlayQueue = ::playQueue,
+                onSkipNext = ::skipNext,
+                onSkipPrevious = ::skipPrevious,
             )
         }
     }
@@ -88,7 +94,8 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Player is still connecting. Try again in a moment.", Toast.LENGTH_SHORT).show()
             return
         }
-        val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
+        val safeIndex = NativePlaybackCore.safeStartIndex(tracks.size, startIndex)
+        if (safeIndex < 0) return
         val action = {
             val items = tracks.map { track ->
                 MediaItem.Builder()
@@ -117,6 +124,34 @@ class MainActivity : ComponentActivity() {
         } else {
             action()
         }
+    }
+
+    private fun skipNext(repeatMode: Int, shuffle: Boolean) {
+        val controller = controllerState.value ?: return
+        val index = NativePlaybackCore.nextIndex(
+            trackCount = controller.mediaItemCount,
+            currentIndex = controller.currentMediaItemIndex,
+            repeatMode = repeatMode,
+            shuffle = shuffle,
+            seed = System.nanoTime(),
+        )
+        if (index >= 0) controller.seekTo(index, 0L)
+    }
+
+    private fun skipPrevious(repeatMode: Int, shuffle: Boolean) {
+        val controller = controllerState.value ?: return
+        if (controller.currentPosition > 3_000L) {
+            controller.seekTo(0L)
+            return
+        }
+        val index = NativePlaybackCore.previousIndex(
+            trackCount = controller.mediaItemCount,
+            currentIndex = controller.currentMediaItemIndex,
+            repeatMode = repeatMode,
+            shuffle = shuffle,
+            seed = System.nanoTime(),
+        )
+        if (index >= 0) controller.seekTo(index, 0L)
     }
 
     override fun onDestroy() {
