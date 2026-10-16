@@ -1,0 +1,20 @@
+{
+  "format": "aurora-extension",
+  "formatVersion": 1,
+  "id": "org.example.night-drive",
+  "name": "Night Drive",
+  "version": "1.0.0",
+  "author": "Example author",
+  "description": "A simple presentation profile for a local music library.",
+  "capabilities": ["ui.home", "theme.accent", "metadata.display"],
+  "presentation": {
+    "accentColor": "#7C5CFF",
+    "homeTitle": "Your night, your soundtrack.",
+    "homeSubtitle": "A calm home for the music already on your device.",
+    "homeBadge": "LOCAL PROFILE",
+    "details": [
+      { "label": "Mode", "value": "Local library" },
+      { "label": "Network playback", "value": "Not provided" }
+    ]
+  }
+}
