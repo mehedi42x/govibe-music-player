@@ -43,9 +43,10 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag_name }}
-          name: NextVibe 0.3.0-nextvibe-preview - Experimental Debug APK
+          name: NextVibe 0.3.1-nextvibe-preview - Experimental Debug APK
           body: |
             EXPERIMENTAL TEST BUILD — DRAFT, DEBUG-SIGNED; NOT FOR PRODUCTION.
+            This APK is not signed by Google Play; Android may show a sideloading or unknown-publisher warning.
             This build uses Gradle's auto-generated Android debug key for review only.
             SHA-256 in SHA256SUMS.txt. Do not distribute as a production build.
           draft: true

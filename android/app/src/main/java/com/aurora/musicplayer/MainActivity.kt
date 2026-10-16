@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,10 +32,13 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val controllerState = androidx.compose.runtime.mutableStateOf<MediaController?>(null)
+    private val deviceAudioPermissionState = androidx.compose.runtime.mutableStateOf(false)
     private lateinit var app: AuroraApplication
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var pendingPlayback: (() -> Unit)? = null
     private var lastRecordedMediaId: String? = null
+    private var audioScanInProgress = false
+    private var lastAutoScanStartedAtMs = 0L
 
     private val historyListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -65,13 +69,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private val audioReadPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) scanDeviceAudioNow()
+        deviceAudioPermissionState.value = granted
+        if (granted) maybeAutoScanDeviceAudio()
         else Toast.makeText(this, "Allow audio access to scan music on this device.", Toast.LENGTH_LONG).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         app = application as AuroraApplication
+        deviceAudioPermissionState.value = hasDeviceAudioPermission()
         window.statusBarColor = android.graphics.Color.rgb(8, 13, 25)
         window.navigationBarColor = android.graphics.Color.rgb(8, 13, 25)
 
@@ -83,6 +89,7 @@ class MainActivity : ComponentActivity() {
                 library = app.library,
                 extensions = app.extensions,
                 player = controllerState.value,
+                hasDeviceAudioPermission = deviceAudioPermissionState.value,
                 onImportAudio = { audioPicker.launch(arrayOf("audio/*")) },
                 onScanDeviceAudio = ::requestDeviceAudioScan,
                 onAudioSettingsChange = { volume, boostDb, preset -> PlaybackService.updateAudioSettings(volume, boostDb, preset) },
@@ -94,28 +101,65 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::app.isInitialized) maybeAutoScanDeviceAudio()
+    }
+
     private fun requestDeviceAudioScan() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
-            scanDeviceAudioNow()
+        val permission = audioReadPermissionName()
+        if (hasDeviceAudioPermission()) {
+            maybeAutoScanDeviceAudio()
         } else {
             audioReadPermission.launch(permission)
         }
     }
 
+    private fun audioReadPermissionName(): String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    private fun hasDeviceAudioPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, audioReadPermissionName()) == PackageManager.PERMISSION_GRANTED
+
+    private fun maybeAutoScanDeviceAudio() {
+        val granted = hasDeviceAudioPermission()
+        deviceAudioPermissionState.value = granted
+        if (!granted) {
+            lastAutoScanStartedAtMs = 0L
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        if (!com.aurora.musicplayer.data.AudioScanPolicy.shouldAutoScan(
+                hasPermission = granted,
+                scanInProgress = audioScanInProgress,
+                lastScanStartedAtMs = lastAutoScanStartedAtMs,
+                nowMs = now,
+            )
+        ) return
+
+        lastAutoScanStartedAtMs = now
+        scanDeviceAudioNow()
+    }
+
     private fun scanDeviceAudioNow() {
+        if (!hasDeviceAudioPermission() || audioScanInProgress) return
+        audioScanInProgress = true
         lifecycleScope.launch {
-            runCatching { app.library.scanDeviceAudio() }
-                .onSuccess { count ->
-                    Toast.makeText(this@MainActivity, "Found $count audio file${if (count == 1) "" else "s"} on this device.", Toast.LENGTH_SHORT).show()
+            try {
+                app.library.scanDeviceAudio()
+            } catch (error: Exception) {
+                if (error is SecurityException) {
+                    deviceAudioPermissionState.value = false
+                    lastAutoScanStartedAtMs = 0L
                 }
-                .onFailure { error ->
-                    Toast.makeText(this@MainActivity, error.message ?: "Could not scan device audio.", Toast.LENGTH_LONG).show()
-                }
+                Toast.makeText(this@MainActivity, error.message ?: "Could not scan device audio.", Toast.LENGTH_LONG).show()
+            } finally {
+                audioScanInProgress = false
+            }
         }
     }
 

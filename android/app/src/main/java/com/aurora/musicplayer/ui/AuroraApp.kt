@@ -4,11 +4,14 @@
 package com.aurora.musicplayer.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,7 +68,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -80,6 +82,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
@@ -108,6 +111,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.aurora.musicplayer.data.AudioLibraryRepository
+import com.aurora.musicplayer.data.AudioScanPolicy
 import com.aurora.musicplayer.data.AudioTrackEntity
 import com.aurora.musicplayer.data.CatalogTrack
 import com.aurora.musicplayer.data.MusicRecommendations
@@ -153,6 +157,7 @@ fun AuroraApp(
     library: AudioLibraryRepository,
     extensions: ExtensionRepository,
     player: MediaController?,
+    hasDeviceAudioPermission: Boolean,
     onImportAudio: () -> Unit,
     onScanDeviceAudio: () -> Unit,
     onAudioSettingsChange: (Float, Float, Int) -> Unit,
@@ -203,6 +208,7 @@ fun AuroraApp(
     var volumeBoostDb by remember { mutableStateOf(prefs.getFloat("volume-boost-db", 0f).coerceIn(0f, 3f)) }
     var equalizerPreset by remember { mutableStateOf(prefs.getInt("equalizer-preset", 0).coerceIn(0, 3)) }
     val activeSourceProfile = activeProfile?.takeIf { it.enabled && it.manifest.source != null }
+    val canRequestDeviceAudioPermission = AudioScanPolicy.shouldShowPermissionAction(hasDeviceAudioPermission)
     val startDownload: (CatalogTrack) -> Unit = { track ->
         val key = track.downloadKey()
         if (activeDownloadKey == null) {
@@ -353,27 +359,30 @@ fun AuroraApp(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(
+                TopAppBar(
                     title = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
                             Text("NextVibe", fontWeight = FontWeight.Black, letterSpacing = 1.6.sp)
-                            Text(
-                                if (openedArtist != null) "ARTIST PROFILE"
-                                else if (playerMode == PlayerMode.ONLINE) activeSourceProfile?.manifest?.name ?: "ONLINE MUSIC"
-                                else if (networkAvailable) "OFFLINE PLAYER" else "OFFLINE · NO CONNECTION",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            PlayerModeSwitch(
-                                mode = playerMode,
-                                onlineAvailable = networkAvailable,
-                                onSelect = { selected -> offlineModeSelected = selected == PlayerMode.OFFLINE },
-                            )
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (openedArtist != null) "ARTIST PROFILE"
+                                    else if (playerMode == PlayerMode.ONLINE) activeSourceProfile?.manifest?.name ?: "ONLINE MUSIC"
+                                    else if (networkAvailable) "OFFLINE PLAYER" else "OFFLINE · NO CONNECTION",
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                PlayerModeSwitch(
+                                    mode = playerMode,
+                                    onlineAvailable = networkAvailable,
+                                    onSelect = { selected -> offlineModeSelected = selected == PlayerMode.OFFLINE },
+                                )
+                            }
                         }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
             },
             bottomBar = {
@@ -428,6 +437,7 @@ fun AuroraApp(
                         currentId = playback.mediaId,
                         playing = playback.playing,
                         onScanDeviceAudio = onScanDeviceAudio,
+                        canRequestDeviceAudioPermission = canRequestDeviceAudioPermission,
                         onImportAudio = onImportAudio,
                         onPlay = { index -> playLocalAndOpen(tracks, index) },
                         onFavorite = { track -> scope.launch { library.setFavorite(track.uri, !track.isFavorite) } },
@@ -441,6 +451,8 @@ fun AuroraApp(
                         feedLoading = feedLoading,
                         feedError = feedError,
                         onImport = onImportAudio,
+                        onScanDeviceAudio = onScanDeviceAudio,
+                        canRequestDeviceAudioPermission = canRequestDeviceAudioPermission,
                         onSearch = { selectedTab = AppTab.SEARCH },
                         onOpenSettings = { selectedTab = AppTab.SETTINGS },
                         onPlayLocal = { index -> playLocalAndOpen(tracks, index) },
@@ -471,6 +483,7 @@ fun AuroraApp(
                         playing = playback.playing,
                         onImport = onImportAudio,
                         onScanDeviceAudio = onScanDeviceAudio,
+                        canRequestDeviceAudioPermission = canRequestDeviceAudioPermission,
                         onPlay = { index -> playLocalAndOpen(tracks, index) },
                         onFavorite = { track -> scope.launch { library.setFavorite(track.uri, !track.isFavorite) } },
                     )
@@ -544,6 +557,8 @@ private fun HomeScreen(
     feedLoading: Boolean,
     feedError: String?,
     onImport: () -> Unit,
+    onScanDeviceAudio: () -> Unit,
+    canRequestDeviceAudioPermission: Boolean,
     onSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onPlayLocal: (Int) -> Unit,
@@ -659,7 +674,14 @@ private fun HomeScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Bring your own music", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Choose audio files from your device. NextVibe keeps the library index local.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = onImport) { Text("Add local audio") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (canRequestDeviceAudioPermission) {
+                            Button(onClick = onScanDeviceAudio) { Text("Allow and scan") }
+                            TextButton(onClick = onImport) { Text("Pick files") }
+                        } else {
+                            Button(onClick = onImport) { Text("Add local audio") }
+                        }
+                    }
                 }
             }
         }
@@ -684,6 +706,7 @@ private fun SearchScreen(
     onFavorite: (AudioTrackEntity) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val localResults = remember(query, localTracks) {
         if (query.isBlank()) emptyList() else localTracks.filter {
             it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true) || it.album.contains(query, ignoreCase = true)
@@ -699,6 +722,15 @@ private fun SearchScreen(
             label = { Text("Search songs, artists or albums") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         )
+        if (query.isNotBlank()) {
+            TextButton(onClick = {
+                val url = Uri.parse("https://music.youtube.com/search?q=${Uri.encode(query)}")
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url)) }
+                    .onFailure { Toast.makeText(context, "Could not open YouTube Music.", Toast.LENGTH_SHORT).show() }
+            }) {
+                Text("Search on YouTube Music")
+            }
+        }
         if (activeProfile?.manifest?.source == null && !offlineMode) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(16.dp)) {
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -751,6 +783,7 @@ private fun LibraryScreen(
     playing: Boolean,
     onImport: () -> Unit,
     onScanDeviceAudio: () -> Unit,
+    canRequestDeviceAudioPermission: Boolean,
     onPlay: (Int) -> Unit,
     onFavorite: (AudioTrackEntity) -> Unit,
 ) {
@@ -773,7 +806,9 @@ private fun LibraryScreen(
         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("${filtered.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row {
-                TextButton(onClick = onScanDeviceAudio) { Text("Scan device") }
+                if (canRequestDeviceAudioPermission) {
+                    TextButton(onClick = onScanDeviceAudio) { Text("Allow device scan") }
+                }
                 TextButton(onClick = onImport) { Text("Pick audio") }
             }
         }
@@ -1046,6 +1081,7 @@ private fun OfflineHomeScreen(
     currentId: String?,
     playing: Boolean,
     onScanDeviceAudio: () -> Unit,
+    canRequestDeviceAudioPermission: Boolean,
     onImportAudio: () -> Unit,
     onPlay: (Int) -> Unit,
     onFavorite: (AudioTrackEntity) -> Unit,
@@ -1063,9 +1099,11 @@ private fun OfflineHomeScreen(
                 ) {
                     Text("OFFLINE PLAYER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Text("Your music,\nready offline.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
-                    Text("Scan audio indexed by Android on this device, or pick individual files. Your library stays here.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Shared audio is scanned automatically after access is granted. You can also pick individual files; your library stays on this device.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onScanDeviceAudio) { Text("Scan device audio") }
+                        if (canRequestDeviceAudioPermission) {
+                            Button(onClick = onScanDeviceAudio) { Text("Allow and scan") }
+                        }
                         TextButton(onClick = onImportAudio) { Text("Pick files") }
                     }
                     Text("${tracks.size} local tracks · no network needed", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1077,7 +1115,12 @@ private fun OfflineHomeScreen(
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Start with your device library", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Android will ask for audio access only when you tap Scan. You can still pick individual files if you decline.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (canRequestDeviceAudioPermission) "Allow audio access to scan the shared music library automatically. You can still pick individual files if you decline."
+                            else "The device library has been scanned. You can still pick individual files if needed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
