@@ -1,7 +1,14 @@
 version: 2
 updates:
-  - package-ecosystem: npm
-    directory: /
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+  - package-ecosystem: cargo
+    directory: /rust/govibe-core
     schedule:
       interval: weekly
       day: tuesday

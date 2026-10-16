@@ -4,15 +4,15 @@
 
 ## Verification
 
-- [ ] `npm run typecheck`
-- [ ] `npm run lint`
-- [ ] `npm test`
-- [ ] `npm run build`
-- [ ] `npm audit --audit-level=moderate`
+- [ ] `cargo fmt --manifest-path rust/govibe-core/Cargo.toml -- --check`
+- [ ] `cargo test --manifest-path rust/govibe-core/Cargo.toml`
+- [ ] `cargo clippy --manifest-path rust/govibe-core/Cargo.toml --all-targets -- -D warnings`
+- [ ] Android debug build/device test completed where SDK/NDK licenses and hardware are available
 
 ## Review checklist
 
 - [ ] Documentation and migration notes updated where needed.
-- [ ] Privacy, permissions, authorization, and accessibility considered.
+- [ ] Privacy, permissions, authorization, accessibility, and license implications considered.
+- [ ] Third-party license notices are preserved accurately.
 - [ ] No credentials, personal data, copyrighted audio, or generated build output committed.
 - [ ] Provider capabilities and audio-quality claims match verified behavior.
