@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
         }
         val safeIndex = NativePlaybackCore.safeStartIndex(tracks.size, startIndex)
         if (safeIndex < 0) return
-        val action = {
+        val action: () -> Unit = {
             val items = tracks.map { track ->
                 MediaItem.Builder()
                     .setMediaId(track.uri)
