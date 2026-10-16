@@ -30,7 +30,7 @@ jobs:
           echo "ANDROID_NDK_HOME=$n" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$n" >> "$GITHUB_ENV"
       - run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android && cargo install cargo-ndk --locked
-      - run: ./gradlew --no-daemon :app:assembleDebug
+      - run: ./gradlew --no-daemon --stacktrace :app:assembleDebug
         working-directory: android
       - run: |
           set -eu
