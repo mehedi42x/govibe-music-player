@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Mehedi Hasan
+// SPDX-License-Identifier: GPL-3.0-only
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -5,9 +8,23 @@ plugins {
     id 'org.jetbrains.kotlin.kapt'
 }
 
+def rustBuildProfile = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') } ? 'release' : 'debug'
+def rustJniOutput = layout.buildDirectory.dir('generated/jniLibs/rust')
+
+def rustBuildTask = tasks.register('buildRustCore', Exec) {
+    group = 'build'
+    description = 'Build the Rust playback engine for Android ABIs without accepting SDK licenses.'
+    inputs.files(fileTree('../rust') { include '**/*' })
+    inputs.file('../scripts/build-android-rust.sh')
+    inputs.property('rustBuildProfile', rustBuildProfile)
+    outputs.dir(rustJniOutput)
+    commandLine 'bash', rootProject.file('../scripts/build-android-rust.sh').absolutePath, rustJniOutput.get().asFile.absolutePath, rustBuildProfile
+}
+
 android {
     namespace 'com.aurora.musicplayer'
     compileSdk 36
+    ndkVersion '27.2.12479018'
 
     defaultConfig {
         applicationId 'com.aurora.musicplayer'
@@ -16,11 +33,39 @@ android {
         versionCode 2
         versionName '0.2.0-native-review'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+    }
+
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (keystorePath != null && !keystorePath.isBlank()) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 
     buildFeatures {
         compose true
         buildConfig true
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDir(rustJniOutput)
+        }
     }
 
     compileOptions {
@@ -37,6 +82,10 @@ android {
             excludes += ['/META-INF/LICENSE*', '/META-INF/NOTICE*']
         }
     }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(rustBuildTask)
 }
 
 kapt {
