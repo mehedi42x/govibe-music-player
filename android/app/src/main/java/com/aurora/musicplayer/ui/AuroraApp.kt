@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Mehedi Hasan
+// SPDX-License-Identifier: GPL-3.0-only
+
 package com.aurora.musicplayer.ui
 
 import android.graphics.Color as AndroidColor
@@ -79,6 +82,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.aurora.musicplayer.data.AudioLibraryRepository
 import com.aurora.musicplayer.data.AudioTrackEntity
+import com.aurora.musicplayer.core.NativePlaybackCore
 import com.aurora.musicplayer.extensions.ExtensionRepository
 import com.aurora.musicplayer.extensions.InstalledExtensionProfile
 import kotlinx.coroutines.delay
@@ -105,6 +109,8 @@ fun AuroraApp(
     player: MediaController?,
     onImportAudio: () -> Unit,
     onPlayQueue: (List<AudioTrackEntity>, Int) -> Unit,
+    onSkipNext: (Int, Boolean) -> Unit,
+    onSkipPrevious: (Int, Boolean) -> Unit,
 ) {
     val tracks by library.observeTracks().collectAsState(initial = emptyList())
     val favorites by library.observeFavorites().collectAsState(initial = emptyList())
@@ -117,10 +123,21 @@ fun AuroraApp(
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
     val prefs = remember(context) { context.getSharedPreferences("aurora-ui-settings", 0) }
     var darkTheme by remember { mutableStateOf(prefs.getBoolean("dark-theme", true)) }
+    var shuffleEnabled by remember { mutableStateOf(prefs.getBoolean("shuffle-enabled", false)) }
+    var repeatMode by remember { mutableStateOf(prefs.getInt("repeat-mode", NativePlaybackCore.REPEAT_OFF).coerceIn(0, 2)) }
     val accent = remember(activeProfile?.manifest?.presentation?.accentColor) {
         runCatching {
             Color(AndroidColor.parseColor(activeProfile?.manifest?.presentation?.accentColor ?: "#B7E36B"))
         }.getOrDefault(Color(0xFFB7E36B))
+    }
+
+    LaunchedEffect(player, shuffleEnabled, repeatMode) {
+        player?.shuffleModeEnabled = shuffleEnabled
+        player?.repeatMode = when (repeatMode) {
+            NativePlaybackCore.REPEAT_ALL -> Player.REPEAT_MODE_ALL
+            NativePlaybackCore.REPEAT_ONE -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
     }
 
     AuroraTheme(accent = accent, darkTheme = darkTheme) {
@@ -146,7 +163,7 @@ fun AuroraApp(
                             playback = playback,
                             onOpen = { showNowPlaying = true },
                             onToggle = { if (player?.isPlaying == true) player.pause() else player?.play() },
-                            onNext = { player?.seekToNextMediaItem() },
+                            onNext = { onSkipNext(repeatMode, shuffleEnabled) },
                         )
                     }
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
@@ -200,6 +217,16 @@ fun AuroraApp(
                         },
                         libraryCount = tracks.size,
                         onClearLibrary = { scope.launch { library.clearLibrary() } },
+                        shuffleEnabled = shuffleEnabled,
+                        onShuffleEnabledChange = {
+                            shuffleEnabled = it
+                            prefs.edit().putBoolean("shuffle-enabled", it).apply()
+                        },
+                        repeatMode = repeatMode,
+                        onRepeatModeChange = {
+                            repeatMode = it
+                            prefs.edit().putInt("repeat-mode", it).apply()
+                        },
                     )
                 }
             }
@@ -211,6 +238,8 @@ fun AuroraApp(
                     playback = playback,
                     player = player,
                     onClose = { showNowPlaying = false },
+                    onSkipNext = { onSkipNext(repeatMode, shuffleEnabled) },
+                    onSkipPrevious = { onSkipPrevious(repeatMode, shuffleEnabled) },
                 )
             }
         }
@@ -427,7 +456,13 @@ private fun MiniPlayer(playback: PlaybackSnapshot, onOpen: () -> Unit, onToggle:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NowPlayingPanel(playback: PlaybackSnapshot, player: MediaController?, onClose: () -> Unit) {
+private fun NowPlayingPanel(
+    playback: PlaybackSnapshot,
+    player: MediaController?,
+    onClose: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(28.dp)).background(
@@ -449,11 +484,11 @@ private fun NowPlayingPanel(playback: PlaybackSnapshot, player: MediaController?
             Text(formatDuration(playback.durationMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-            IconButton(onClick = { player?.seekToPreviousMediaItem() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, "Previous", modifier = Modifier.size(34.dp)) }
+            IconButton(onClick = onSkipPrevious, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, "Previous", modifier = Modifier.size(34.dp)) }
             FloatingActionButton(onClick = { if (playback.playing) player?.pause() else player?.play() }) {
                 Icon(if (playback.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if (playback.playing) "Pause" else "Play", modifier = Modifier.size(30.dp))
             }
-            IconButton(onClick = { player?.seekToNextMediaItem() }, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(34.dp)) }
+            IconButton(onClick = onSkipNext, modifier = Modifier.size(56.dp)) { Icon(Icons.Default.SkipNext, "Next", modifier = Modifier.size(34.dp)) }
         }
         Text("Source audio is passed to the device decoder; actual output depends on the Android device and selected route.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onClose) { Text("Close") }

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Mehedi Hasan
+// SPDX-License-Identifier: GPL-3.0-only
+
 package com.aurora.musicplayer.ui
 
 import android.widget.Toast
@@ -52,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aurora.musicplayer.core.NativePlaybackCore
 import com.aurora.musicplayer.extensions.ExtensionManifest
 import com.aurora.musicplayer.extensions.ExtensionManifestParser
 import com.aurora.musicplayer.extensions.ExtensionRepository
@@ -252,6 +256,10 @@ fun SettingsScreen(
     onDarkThemeChange: (Boolean) -> Unit,
     libraryCount: Int,
     onClearLibrary: () -> Unit,
+    shuffleEnabled: Boolean,
+    onShuffleEnabledChange: (Boolean) -> Unit,
+    repeatMode: Int,
+    onRepeatModeChange: (Int) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
@@ -269,6 +277,33 @@ fun SettingsScreen(
                     Text("Use GoVibe's dark-first palette.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange)
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Shuffle", fontWeight = FontWeight.SemiBold)
+                    Text("Randomize playback navigation.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = shuffleEnabled, onCheckedChange = onShuffleEnabledChange)
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Repeat", fontWeight = FontWeight.SemiBold)
+                listOf(
+                    NativePlaybackCore.REPEAT_OFF to "Off",
+                    NativePlaybackCore.REPEAT_ALL to "All tracks",
+                    NativePlaybackCore.REPEAT_ONE to "Current track",
+                ).forEach { (mode, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = repeatMode == mode, onClick = { onRepeatModeChange(mode) })
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Text("Queue navigation is calculated by GoVibe's Rust playback core.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 

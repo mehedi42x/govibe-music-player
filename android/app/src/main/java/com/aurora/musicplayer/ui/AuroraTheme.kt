@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Mehedi Hasan
+// SPDX-License-Identifier: GPL-3.0-only
+
 package com.aurora.musicplayer.ui
 
 import androidx.compose.material3.MaterialTheme
