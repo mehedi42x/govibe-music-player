@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Mehedi Hasan
+# SPDX-License-Identifier: GPL-3.0-only
 name: Security checks
 
 on:
@@ -12,20 +14,23 @@ permissions:
   contents: read
 
 jobs:
-  dependency-audit:
-    name: npm dependency audit
+  source-checks:
+    name: Rust source and dependency checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm audit --audit-level=moderate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check dependency tree
+        run: cargo tree --manifest-path rust/govibe-core/Cargo.toml
+      - name: Rust tests and lint
+        run: |
+          cargo test --manifest-path rust/govibe-core/Cargo.toml
+          cargo clippy --manifest-path rust/govibe-core/Cargo.toml --all-targets -- -D warnings
 
   secret-scan:
     name: Gitleaks secret scan
@@ -33,7 +38,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out full history
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Scan repository history and changes
