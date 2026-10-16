@@ -15,12 +15,20 @@ jobs:
         run: |
           set -eu
           s="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          [ -d "$s" ] || { echo 'Android SDK missing; no SDK install/licenses.' >&2; exit 1; }
-          for p in platforms/android-36 build-tools/35.0.0 ndk/27.2.12479018; do
-            [ -d "$s/$p" ] || { echo "Missing preinstalled $p; no SDK install/license acceptance." >&2; exit 1; }
+          [ -n "$s" ] && [ -d "$s" ] || { echo 'Android SDK missing; no SDK install/licenses.' >&2; exit 1; }
+          [ -s "$s/platforms/android-36/android.jar" ] || { echo "Missing preinstalled Android SDK API 36 under $s/platforms/android-36; no SDK install/license acceptance." >&2; exit 1; }
+          b="$s/build-tools/35.0.0"
+          for t in aapt apksigner zipalign; do
+            [ -x "$b/$t" ] || { echo "Missing preinstalled Build Tools 35.0.0 executable: $b/$t; no SDK install/license acceptance." >&2; exit 1; }
           done
+          n="$s/ndk/27.3.13750724"
+          [ -d "$n" ] && [ -f "$n/source.properties" ] || { echo "Missing preinstalled NDK 27.3.13750724 under $s/ndk; no SDK/NDK install/license acceptance." >&2; exit 1; }
+          rev="$(awk -F= '/^Pkg.Revision[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' "$n/source.properties")"
+          [ "$rev" = '27.3.13750724' ] || { echo "Preinstalled NDK revision mismatch: expected 27.3.13750724, found $rev." >&2; exit 1; }
           echo "ANDROID_HOME=$s" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$s/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$s" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$n" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$n" >> "$GITHUB_ENV"
       - run: rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android && cargo install cargo-ndk --locked
       - run: ./gradlew --no-daemon :app:assembleDebug
         working-directory: android
