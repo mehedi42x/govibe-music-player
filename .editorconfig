@@ -10,3 +10,6 @@ trim_trailing_whitespace = true
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.{kt,java,rs,gradle}]
+indent_size = 4

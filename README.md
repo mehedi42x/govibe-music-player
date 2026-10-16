@@ -1,60 +1,55 @@
 # GoVibe
 
-**A local-first music player for the music you already own.**
+**A private, local-first music player for the audio you already own.**
 
-GoVibe has two separate clients: a React/TypeScript progressive web app (PWA) for browsers and a native Kotlin/Jetpack Compose Android app. The Android app uses the system document picker, Room for local metadata, and Media3 for playback; it does not embed the web app.
+This review tree contains one native Android application: **Kotlin with Jetpack Compose** for the interface and Android integration, plus a dependency-free **Rust** playback-queue core connected through JNI. The former React/TypeScript browser client and its Node/Vite toolchain are not part of this migration.
 
-The displayed app name is **GoVibe**. The Android application ID (`com.aurora.musicplayer`) and `.aurora.json` format identifiers remain unchanged for compatibility.
+The Android application ID (`com.aurora.musicplayer`) and declarative `.aurora.json` extension format remain unchanged for compatibility. GoVibe branding is preserved. This is a local source review; it is not a release and no rewritten bundle has been published.
 
-## Native Android
+## App behavior
 
-- Import audio through Android's system document picker; no broad media-library permission is requested.
-- Store selected-file URI references and best-effort metadata locally in Room; audio is not uploaded or copied to a server.
-- Play selected local audio through Android Media3 with a `MediaSessionService` and system media controls.
-- Search the library, favorite tracks, play a queue, and control playback in Compose.
-- Use a dark-first interface with a light-appearance option.
-- The app includes **no preinstalled extensions**. GoVibe's default home is part of the app itself, not an extension.
-- Add optional declarative `.aurora.json` home profiles through the plus-button JSON editor or a user-initiated public GitHub scan. Profiles can change presentation text and accent color; they cannot run code, access music, request credentials, or stream audio.
+- Import audio with Android's system document picker; GoVibe does not request broad storage access or scan the device.
+- Keep selected document URI references and best-effort metadata in the local Room database. Audio is neither uploaded nor copied to a server.
+- Play user-selected audio through AndroidX Media3 and a `MediaSessionService` with system playback controls.
+- Search the local library, favorite tracks, and control queue navigation, shuffle, and repeat. Rust calculates safe queue indexes and navigation transitions; Kotlin owns the UI and Android lifecycle.
+- Choose dark or light appearance.
+- Fresh installs contain **no preinstalled extensions**. GoVibe's default home is built into the app.
+- Add optional, declarative `.aurora.json` home profiles by pasting JSON or scanning a public GitHub repository after an explicit user action. Profiles can change presentation text and accent color; they cannot execute code, access audio, request credentials, or stream music.
 
-## Web PWA
+## Source layout
 
-The independent browser app supports local audio import/playback, library search, favorites, queue, and IndexedDB persistence. It includes no bundled third-party extension or remote provider runtime. Browser codec, storage, and background-playback support varies by device.
+- `android/` — Kotlin/Jetpack Compose application, Room storage, document picker, Media3 playback, and the JSON/GitHub extension manager.
+- `rust/govibe-core/` — standard-library-only Rust queue engine and JNI entry points, with host unit tests.
+- `aurora-extension-format/` — versioned JSON schema for non-executable presentation profiles.
+- `scripts/build-android-rust.sh` — cross-compiles the Rust shared library for Android ABIs when invoked by Gradle.
 
-On Android, the PWA can be installed from a trusted HTTPS origin using Chrome's **Install app** or **Add to Home screen** menu. This is a browser-installed PWA, not an APK; it does not use the native Media3 service.
+## Verify the Rust core
 
-```bash
-npm ci
-npm run dev
-```
-
-Run the web checks:
+Requires Rust and Cargo:
 
 ```bash
-npm run format:check
-npm run typecheck
-npm run lint
-npm test
-npm run build
-npm audit --audit-level=moderate
+cargo fmt --manifest-path rust/govibe-core/Cargo.toml -- --check
+cargo test --manifest-path rust/govibe-core/Cargo.toml
+cargo clippy --manifest-path rust/govibe-core/Cargo.toml --all-targets -- -D warnings
 ```
 
-## Build a local Android APK
+## Build a local Android debug APK
 
-See [Building](docs/BUILDING.md) for prerequisites. The source review bundle does not include a prebuilt APK; native Gradle and device verification remain pending.
+An Android build requires JDK 17+, Android SDK Platform/API 36 and Build-Tools 36.0.0, Android NDK, Rust, and `cargo-ndk`. Review Google's SDK/NDK terms before installing or using them. The project does not accept SDK licenses automatically; no SDK license has been accepted as part of this review.
+
+After installing those prerequisites yourself and configuring `ANDROID_HOME`/`ANDROID_SDK_ROOT` and `ANDROID_NDK_HOME`, run:
 
 ```bash
 cd android
 ./gradlew assembleDebug
 ```
 
-Expected output: `app/build/outputs/apk/debug/app-debug.apk`. This is a debug-signed local test build, not a Play Store release. See [Installation](docs/INSTALLATION.md).
+Gradle invokes `scripts/build-android-rust.sh` and packages `libgovibe_core.so`; expected APK output is `android/app/build/outputs/apk/debug/app-debug.apk`. This is only a local debug build, not a release. The current review computer has no Android SDK/NDK or `cargo-ndk`, so an APK cannot be built or device-tested here.
 
-## Extensions and integrations
+## Extensions and privacy
 
-See [Extension setup](docs/EXTENSIONS.md), the [v1 JSON schema](aurora-extension-format/schema-v1.json), and [Provider integrations](docs/PROVIDER_INTEGRATIONS.md). A fresh installation has no extensions; GoVibe's app-native home remains available until the user installs and selects a profile.
+See [Extension setup](docs/EXTENSIONS.md), the [v1 JSON schema](aurora-extension-format/schema-v1.json), [Architecture](docs/ARCHITECTURE.md), and [Privacy](docs/PRIVACY.md). A public GitHub scan only retrieves bounded JSON manifests from the repository's `aurora-extensions/` folder; it does not download or run extension code.
 
-## Audio quality and privacy
+## License
 
-GoVibe does not claim bit-perfect or verified lossless output. Android passes selected local audio to the device media decoder; the device, decoder, and output route determine the actual result. See [Audio quality](docs/AUDIO_QUALITY.md) and [Privacy](docs/PRIVACY.md).
-
-GoVibe is licensed under [0BSD](LICENSE); see [third-party notices](THIRD_PARTY_NOTICES.md). The source bundle contains no APK, signing credentials, local SDK state, or bundled extension manifests.
+This review-tree revision licenses GoVibe-authored code under [GNU GPL version 3](LICENSE), SPDX `GPL-3.0-only`. Third-party components retain their own licenses; their notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) are unchanged. Earlier copies already published with the 0BSD license remain available under the permissions granted with those copies; changing this working tree cannot retroactively revoke that grant. This change is local for review and has not been pushed to the public repository.

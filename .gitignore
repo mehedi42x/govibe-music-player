@@ -1,19 +1,27 @@
-node_modules/
-dist/
-coverage/
-.vite/
-*.tsbuildinfo
+# Android / Gradle outputs
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.idea/
+
+# Rust build artifacts
+**/target/
+
+# Private signing material
+*.jks
+*.keystore
+*.p12
+
+# Local configuration and secrets
 *.local
 .env
 .env.*
 !.env.example
+
+# OS/editor and general temporary files
 .DS_Store
 Thumbs.db
 *.log
 __pycache__/
 *.py[cod]
 .venv/
-android/.gradle/
-android/**/build/
-android/local.properties
-android/.idea/

@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: 'If you use GoVibe, please cite the version of the software you used.'
-title: 'GoVibe: Local-First Music Player'
-version: 0.1.0
-license: 0BSD
-abstract: 'A local-first music player with a native Android client and an independent browser PWA.'
+title: 'GoVibe: Local-First Android Music Player'
+version: 0.2.0
+license: GPL-3.0-only
+abstract: 'A local-first Android music player built with Kotlin and Jetpack Compose, with a Rust playback-queue core and declarative JSON extension profiles.'
 authors:
-  - name: 'GoVibe contributors'
+  - name: 'Mehedi Hasan'
