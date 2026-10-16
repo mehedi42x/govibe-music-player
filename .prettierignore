@@ -1,8 +1,0 @@
-node_modules/
-dist/
-coverage/
-package-lock.json
-THIRD_PARTY_NOTICES.md
-*.png
-*.svg
-android/
