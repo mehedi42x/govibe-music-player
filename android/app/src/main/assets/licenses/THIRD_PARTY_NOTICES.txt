@@ -1,0 +1,23 @@
+GoVibe Android Native Client — Third-party software notices
+
+Direct AndroidX runtime dependencies in the native app are licensed under the Apache License, Version 2.0. A copy is bundled as Apache-2.0.txt in this folder. Upstream license: https://github.com/androidx/androidx/blob/androidx-main/LICENSE.txt
+
+Media3 upstream source and license: https://github.com/androidx/media (Apache-2.0).
+
+Direct dependencies and pinned versions:
+- androidx.compose:compose-bom:2026.09.00 (version alignment platform)
+- androidx.core:core-ktx:1.19.1
+- androidx.activity:activity-compose:1.13.0
+- androidx.lifecycle:lifecycle-runtime-ktx:2.11.0
+- androidx.lifecycle:lifecycle-runtime-compose:2.11.0
+- androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0
+- androidx.compose.ui:ui and ui-tooling-preview (Compose BOM 2026.09.00)
+- androidx.compose.material3:material3 (Compose BOM 2026.09.00)
+- androidx.compose.material:material-icons-extended (Compose BOM 2026.09.00)
+- androidx.navigation:navigation-compose:2.10.2
+- androidx.media3:media3-exoplayer:1.11.1
+- androidx.media3:media3-session:1.11.1
+- androidx.room:room-runtime:2.8.5
+- androidx.room:room-ktx:2.8.5
+
+The complete resolved Android runtime/transitive dependency inventory has not yet been generated because Android SDK installation/build is pending approval. Update this notice after the licensed SDK build is available and before distributing a binary.
