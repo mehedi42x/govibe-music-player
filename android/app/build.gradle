@@ -24,7 +24,8 @@ def rustBuildTask = tasks.register('buildRustCore', Exec) {
 
 android {
     namespace 'com.aurora.musicplayer'
-    compileSdk 36
+    compileSdk 37
+    buildToolsVersion '36.0.0'
     ndkVersion '27.3.13750724'
 
     defaultConfig {

@@ -6,7 +6,7 @@ on:
 permissions: {contents: write}
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -16,10 +16,10 @@ jobs:
           set -eu
           s="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           [ -n "$s" ] && [ -d "$s" ] || { echo 'Android SDK missing; no SDK install/licenses.' >&2; exit 1; }
-          [ -s "$s/platforms/android-36/android.jar" ] || { echo "Missing preinstalled Android SDK API 36 under $s/platforms/android-36; no SDK install/license acceptance." >&2; exit 1; }
-          b="$s/build-tools/35.0.0"
+          [ -s "$s/platforms/android-37/android.jar" ] || { echo "Missing preinstalled Android SDK API 37 under $s/platforms/android-37; no SDK install/license acceptance." >&2; exit 1; }
+          b="$s/build-tools/36.0.0"
           for t in aapt apksigner zipalign; do
-            [ -x "$b/$t" ] || { echo "Missing preinstalled Build Tools 35.0.0 executable: $b/$t; no SDK install/license acceptance." >&2; exit 1; }
+            [ -x "$b/$t" ] || { echo "Missing preinstalled Build Tools 36.0.0 executable: $b/$t; no SDK install/license acceptance." >&2; exit 1; }
           done
           n="$s/ndk/27.3.13750724"
           [ -d "$n" ] && [ -f "$n/source.properties" ] || { echo "Missing preinstalled NDK 27.3.13750724 under $s/ndk; no SDK/NDK install/license acceptance." >&2; exit 1; }
@@ -36,7 +36,7 @@ jobs:
           set -eu
           a=app/build/outputs/apk/debug/app-debug.apk
           test -s "$a"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$a"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$a"
           cd app/build/outputs/apk/debug
           sha256sum app-debug.apk > SHA256SUMS.txt
         working-directory: android
