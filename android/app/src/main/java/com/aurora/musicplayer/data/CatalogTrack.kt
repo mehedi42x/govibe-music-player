@@ -20,7 +20,7 @@ data class CatalogTrack(
 object MusicRecommendations {
     fun personalize(tracks: List<CatalogTrack>, tasteArtists: List<String>): List<CatalogTrack> {
         if (tracks.isEmpty() || tasteArtists.isEmpty()) return tracks
-        val preferred = tasteArtists.map(String::normalizedArtist).filter(String::isNotEmpty).toSet()
+        val preferred = tasteArtists.map { it.normalizedArtist() }.filter { it.isNotEmpty() }.toSet()
         return tracks.withIndex()
             .sortedWith(
                 compareByDescending<IndexedValue<CatalogTrack>> { it.value.artist.normalizedArtist() in preferred }

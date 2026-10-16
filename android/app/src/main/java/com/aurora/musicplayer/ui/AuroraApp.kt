@@ -124,8 +124,8 @@ private enum class AppTab(val label: String) {
 
 private enum class PlayerMode { ONLINE, OFFLINE }
 
-private val LocalOpenArtist = staticCompositionLocalOf<(String, Boolean) -> Unit> { _, _ -> }
-private val LocalDownloadTrack = staticCompositionLocalOf<(CatalogTrack) -> Unit> { _ -> }
+private val LocalOpenArtist = staticCompositionLocalOf<(String, Boolean) -> Unit> { { _, _ -> } }
+private val LocalDownloadTrack = staticCompositionLocalOf<(CatalogTrack) -> Unit> { { _ -> } }
 private val LocalDownloadStates = staticCompositionLocalOf<Map<String, DownloadUiState>> { emptyMap() }
 
 private data class DownloadUiState(
