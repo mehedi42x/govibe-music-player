@@ -16,7 +16,7 @@ jobs:
           set -eu
           s="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           [ -n "$s" ] && [ -d "$s" ] || { echo 'Android SDK missing; no SDK install/licenses.' >&2; exit 1; }
-          [ -s "$s/platforms/android-37/android.jar" ] || { echo "Missing preinstalled Android SDK API 37 under $s/platforms/android-37; no SDK install/license acceptance." >&2; exit 1; }
+          [ -s "$s/platforms/android-37.0/android.jar" ] || { echo "Missing preinstalled Android SDK API 37.0 under $s/platforms/android-37.0; no SDK install/license acceptance." >&2; exit 1; }
           b="$s/build-tools/36.0.0"
           for t in aapt apksigner zipalign; do
             [ -x "$b/$t" ] || { echo "Missing preinstalled Build Tools 36.0.0 executable: $b/$t; no SDK install/license acceptance." >&2; exit 1; }
