@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a user-facing improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What user problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and trade-offs
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Considerations
+      options:
+        - label: I have considered privacy, accessibility, browser compatibility, and local-first behavior.

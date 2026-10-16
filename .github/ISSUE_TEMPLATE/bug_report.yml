@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible GoVibe issue.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach private audio, credentials, API tokens, or browser-profile data. Use the private security route for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: GoVibe version or commit
+      placeholder: 0.1.0 / commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and operating system
+      placeholder: Firefox 140 on Ubuntu 24.04
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safe
+    attributes:
+      label: Safe report
+      options:
+        - label: I have removed personal data, credentials, and private/copyrighted audio.
+          required: true

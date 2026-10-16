@@ -1,0 +1,33 @@
+name: Provider integration proposal
+description: Propose a supported, authorized provider or catalog.
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and official API documentation URL
+    validations:
+      required: true
+  - type: textarea
+    id: authorization
+    attributes:
+      label: API terms, authorization model, and supported regions/accounts
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Which capabilities are actually available?
+      description: Separate search, metadata, playback, lyrics, scrobbling, and recommendations.
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data sent, credentials, retention, and privacy impact
+    validations:
+      required: true
+  - type: textarea
+    id: quality
+    attributes:
+      label: Audio format/quality source and how claims would be verified
