@@ -94,6 +94,14 @@ kapt {
     correctErrorTypes = true
 }
 
+// Room 2.8.5's processor resolves kotlin-metadata-jvm 2.2.0, which rejects Kotlin 2.4 metadata.
+// Keep this parser override on KAPT configurations so runtime dependencies remain unchanged.
+configurations.configureEach {
+    if (name.startsWith('kapt')) {
+        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.21'
+    }
+}
+
 dependencies {
     implementation platform('androidx.compose:compose-bom:2026.09.00')
     androidTestImplementation platform('androidx.compose:compose-bom:2026.09.00')
