@@ -3,6 +3,8 @@
 
 package com.aurora.musicplayer.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -91,15 +93,17 @@ fun SettingsScreen(
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        SettingsSectionHeader("Appearance")
         SettingsToggleCard(
             title = "Dark appearance",
             description = "A calm, deep-colour listening space.",
             checked = darkTheme,
             onCheckedChange = onDarkThemeChange,
         )
+        SettingsSectionHeader("Playback")
         AudioSettingsCard(
             volume = playbackVolume,
             onVolumeChange = onPlaybackVolumeChange,
@@ -108,7 +112,6 @@ fun SettingsScreen(
             equalizerPreset = equalizerPreset,
             onEqualizerPresetChange = onEqualizerPresetChange,
         )
-        ExtensionManagerSection(extensions, installed, activeProfile)
         SettingsToggleCard(
             title = "Shuffle",
             description = "Randomize playback navigation.",
@@ -131,21 +134,26 @@ fun SettingsScreen(
                 Text("Queue navigation uses the app's local playback core.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        ExtensionManagerSection(extensions, installed, activeProfile)
+        SettingsSectionHeader("Device library")
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Local library", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("$libraryCount indexed local audio entries, including device scans and offline copies. Clearing removes the app's index and listening history; original files and completed copies in Music/NextVibe are not deleted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(onClick = { showClearDialog = true }, enabled = libraryCount > 0) { Text("Clear library and history") }
+            }
+        }
+        SettingsSectionHeader("Integrations")
+        OfficialServicesCard()
+        SettingsSectionHeader("Privacy")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
                     Text("Privacy and source access", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
-                Text("NextVibe sends catalogue requests only to the source you select. Your search terms go to that source; listening history and personal recommendations stay on this device. Audio-read permission is requested only for device scans. Downloads go to Music/NextVibe; Android 10+ uses scoped MediaStore, while Android 9 and below ask for write access only when you download.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("NextVibe sends catalogue requests only to the source you select. Your search terms go to that source; listening history and personal recommendations stay on this device. Audio-read permission is requested only when you choose to enable device scanning. Downloads go to Music/NextVibe; Android 10+ uses scoped MediaStore, while Android 9 and below ask for write access only when you download.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("A download button appears only when the selected source manifest declares downloadsAllowed=true. That declaration is the source's claim, not a legal check. Sources cannot run code, request credentials, read your library, or replace NextVibe screens; no provider is bundled.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Local library", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("$libraryCount indexed local audio entries, including device scans and offline copies. Clearing removes the app's index and listening history; original files and completed copies in Music/NextVibe are not deleted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = { showClearDialog = true }, enabled = libraryCount > 0) { Text("Clear library and history") }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -164,6 +172,43 @@ fun SettingsScreen(
             },
             dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+@Composable
+private fun OfficialServicesCard() {
+    val context = LocalContext.current
+    val openLink: (String) -> Unit = { url ->
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { Toast.makeText(context, "Could not open that service.", Toast.LENGTH_SHORT).show() }
+    }
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("YouTube Music and Last.fm", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "YouTube Music opens through its official app or website. In-app audio extraction, background streaming, and offline copying are not supported. Last.fm scrobbling and account sync need a registered API key, shared secret, and user session; those credentials are not configured in this build.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { openLink("https://music.youtube.com/") }, modifier = Modifier.weight(1f)) {
+                    Text("YouTube Music", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton(onClick = { openLink("https://www.last.fm/") }, modifier = Modifier.weight(1f)) {
+                    Text("Last.fm")
+                }
+            }
+        }
     }
 }
 

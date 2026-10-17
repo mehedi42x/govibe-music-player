@@ -2,11 +2,15 @@
 
 ## Android APK is missing / Gradle says SDK components are unavailable
 
-This source review does not include a new APK. An Android build needs the SDK Platform/Build Tools listed in [Building](BUILDING.md), the pinned NDK, Rust and `cargo-ndk`. Review SDK/NDK license terms before installation or use. Set `ANDROID_HOME`/`ANDROID_SDK_ROOT` and `ANDROID_NDK_HOME`, then run `cd android && ./gradlew testDebugUnitTest assembleDebug` in a fully provisioned environment.
+An Android build needs the SDK Platform/Build Tools listed in [Building](BUILDING.md), the pinned NDK, Rust and `cargo-ndk`. Set `ANDROID_HOME`/`ANDROID_SDK_ROOT` and `ANDROID_NDK_HOME`, then run `cd android && ./gradlew testDebugUnitTest assembleDebug` in a fully provisioned environment.
+
+## Play Protect or unknown-publisher warning
+
+The experimental GitHub draft APK is signed with Android's debug certificate, not Google Play App Signing or a production publisher key. Sideloaded debug builds have little/no publisher reputation, so Android can display an unknown-publisher or Play Protect warning; this is not fixed by changing the app title, permissions, or package metadata. The legitimate release path is a stable, privately stored production signing key and distribution through Play Console/Play App Signing. Every update to an already installed package must be signed by the same key; a different debug key can make Android reject an update. Do not bypass Play Protect. Verify the APK's SHA-256 from the release before installing, and only install if you trust the source.
 
 ## Device scan shows no tracks or permission was declined
 
-The scan reads only shared audio entries exposed by Android MediaStore. It cannot read another app's private folders or protected storage. Tap **Scan device audio** and grant Android audio permission, or use **Pick files** to select individual tracks through the system picker. Re-run the scan after adding new shared audio.
+The scan reads only shared audio entries exposed by Android MediaStore. It cannot read another app's private folders or protected storage. If audio permission is missing, tap **Allow and scan** and grant Android audio access; after that the app auto-scans when opened/resumed and hides the scan action. Use **Pick files** to select individual tracks through the system picker, or return to the app after adding shared audio to refresh the library.
 
 ## Online mode is unavailable
 
@@ -23,6 +27,10 @@ Artwork loads from a public HTTPS URL, follows at most four validated HTTPS redi
 ## Download button is missing or an offline copy fails
 
 The selected source must declare `downloadsAllowed: true`; the button is intentionally hidden for all other sources. Downloads accept only a public HTTPS response and are limited to 250 MiB and four redirects. DRM/authenticated streams, responses declared as text/HTML or unrelated media, empty responses, and files without an identifiable audio MIME type or extension are rejected. Android 10+ saves through scoped MediaStore to `Music/NextVibe`; on Android 9 and below, grant write permission when prompted. Check free storage and the provider's terms if a download fails.
+
+## YouTube Music or Last.fm integration is unavailable
+
+YouTube Music search opens the official YouTube Music app/site; the official YouTube Data API does not grant an app the right to extract audio, play it in a hidden/background player, or save it offline. Last.fm account sync/scrobbling needs a registered Last.fm API key, shared secret, and an authenticated user session. These credentials are not configured for this preview, so only the official Last.fm website link is available.
 
 ## Volume boost or EQ has no effect
 
