@@ -40,7 +40,7 @@ jobs:
           cd app/build/outputs/apk/debug
           sha256sum app-debug.apk > SHA256SUMS.txt
         working-directory: android
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag_name }}
           target_commitish: ${{ github.sha }}
